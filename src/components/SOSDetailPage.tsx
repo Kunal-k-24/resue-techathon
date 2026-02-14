@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, MapPin, Clock, User, Activity, Navigation, Users, CheckCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, User, Activity, Navigation, Users, CheckCircle, AlertCircle, Shield, ChevronRight, Share2 } from 'lucide-react';
 import { mockSOSAlerts } from '../data/mockData';
 
 interface SOSDetailPageProps {
@@ -24,196 +24,250 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
       case 'medium':
         return 'bg-yellow-600';
       default:
-        return 'bg-gray-600';
+        return 'bg-slate-600';
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
         return 'bg-red-100 text-red-700';
       case 'assigned':
         return 'bg-blue-100 text-blue-700';
       case 'rescued':
-        return 'bg-green-100 text-green-700';
+        return 'bg-emerald-100 text-emerald-700';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
     }
   };
 
   const timeSince = (date: Date) => {
     const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
-    if (minutes < 60) return `${minutes} minutes ago`;
+    if (minutes < 60) return `${minutes}m ago`;
     const hours = Math.floor(minutes / 60);
-    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    return `${hours}h ago`;
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-8 md:pt-20">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <button
-          onClick={() => onNavigate('map')}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back to Map</span>
-        </button>
+    <div className="min-h-screen bg-slate-50 pb-32 md:pb-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Navigation */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => onNavigate('map')}
+            className="group flex items-center gap-3 px-4 py-2 bg-white rounded-2xl shadow-sm border border-slate-200 text-slate-600 hover:text-slate-900 transition-all hover:-translate-x-1"
+          >
+            <ArrowLeft className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <span className="font-black text-xs uppercase tracking-widest">Back to Map</span>
+          </button>
+          
+          <div className="flex items-center gap-2">
+            <span className="flex h-3 w-3 rounded-full bg-red-500 animate-ping"></span>
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-600">Live Transmission</span>
+          </div>
+        </div>
 
         {actionTaken && (
-          <div className="mb-6 bg-green-50 border-2 border-green-500 rounded-lg p-4 animate-scale-in">
-            <div className="flex items-center space-x-3">
-              <CheckCircle className="w-6 h-6 text-green-600" />
-              <div>
-                <p className="font-bold text-green-900">Action Confirmed</p>
-                <p className="text-green-700 text-sm">{actionTaken}</p>
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[110] w-[90%] max-w-md animate-slide-up">
+            <div className="bg-emerald-600 text-white rounded-[2rem] p-4 shadow-2xl flex items-center gap-4">
+              <div className="bg-white/20 p-2 rounded-xl">
+                <CheckCircle className="w-6 h-6" />
               </div>
+              <p className="font-bold text-sm">{actionTaken}</p>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className={`${getUrgencyColor(alert.urgency)} p-6 text-white`}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">SOS Emergency Alert</h1>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(alert.status)} bg-white`}>
-                    {alert.status.toUpperCase()}
-                  </span>
-                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-white bg-opacity-20">
-                    {alert.urgency.toUpperCase()} PRIORITY
-                  </span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Main Detail Column */}
+          <div className="lg:col-span-8 space-y-8">
+            <div className="bg-white rounded-[3rem] shadow-xl shadow-slate-200 overflow-hidden border border-slate-100">
+              {/* Alert Status Banner */}
+              <div className={`${getUrgencyColor(alert.urgency)} p-8 md:p-10 text-white relative`}>
+                <div className="absolute top-0 right-0 p-10 opacity-10">
+                  <Activity className="w-32 h-32" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex flex-wrap items-center gap-4 mb-6">
+                    <span className={`px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white ${getStatusBadge(alert.status).split(' ')[1]}`}>
+                      {alert.status}
+                    </span>
+                    <span className="px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/20">
+                      {alert.urgency} Priority
+                    </span>
+                  </div>
+                  <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-4">SOS DISTRESS</h1>
+                  <div className="flex items-center gap-2 text-white/80 font-bold text-sm">
+                    <Clock className="w-4 h-4" />
+                    Broadcasted {timeSince(alert.timestamp)}
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="flex items-center space-x-2 text-white text-opacity-90">
-                  <Clock className="w-4 h-4" />
-                  <span className="text-sm">{timeSince(alert.timestamp)}</span>
+
+              <div className="p-8 md:p-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  {/* Victim Info */}
+                  <div className="space-y-6">
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                      <User className="w-4 h-4" /> Subject Details
+                    </h2>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[2rem] border border-slate-100 group hover:bg-white hover:border-slate-200 transition-all">
+                        <div className="bg-white p-3 rounded-2xl shadow-sm group-hover:scale-110 transition-transform">
+                          <User className="w-6 h-6 text-slate-400" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Name</p>
+                          <p className="text-xl font-black text-slate-900 tracking-tight">{alert.victimName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[2rem] border border-slate-100 group hover:bg-white hover:border-slate-200 transition-all">
+                        <div className="bg-white p-3 rounded-2xl shadow-sm group-hover:scale-110 transition-transform text-blue-500">
+                          <Activity className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Vitals / Age</p>
+                          <p className="text-xl font-black text-slate-900 tracking-tight">{alert.age}y • Stable</p>
+                        </div>
+                      </div>
+                      <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-orange-600 mb-3 flex items-center gap-2">
+                          <AlertCircle className="w-3 h-3" /> Reported Condition
+                        </p>
+                        <p className="text-slate-800 font-bold leading-relaxed">{alert.condition}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Location Info */}
+                  <div className="space-y-6">
+                    <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                      <MapPin className="w-4 h-4" /> Geodata
+                    </h2>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[2rem] border border-slate-100">
+                        <div className="bg-white p-3 rounded-2xl shadow-sm text-emerald-500">
+                          <MapPin className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Address</p>
+                          <p className="text-sm font-bold text-slate-700 truncate">{alert.location}</p>
+                        </div>
+                      </div>
+                      <div className="relative rounded-[2.5rem] overflow-hidden border-4 border-slate-100 shadow-xl h-48 group">
+                         <div className="absolute inset-0 bg-slate-200 flex items-center justify-center">
+                            <MapPin className="w-12 h-12 text-blue-500 animate-bounce" />
+                         </div>
+                         <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-2xl border border-white/50 flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
+                               {alert.coordinates.lat.toFixed(4)}, {alert.coordinates.lng.toFixed(4)}
+                            </span>
+                            <Navigation className="w-4 h-4 text-blue-500" />
+                         </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Timeline Area */}
+            <div className="bg-white rounded-[3rem] p-10 shadow-lg border border-slate-100">
+              <h2 className="text-xl font-black text-slate-900 tracking-tight mb-8">Mission Timeline</h2>
+              <div className="space-y-8 relative">
+                <div className="absolute left-3 top-3 bottom-3 w-[2px] bg-slate-100"></div>
+                
+                <div className="flex items-start gap-6 relative z-10">
+                  <div className="w-6 h-6 bg-red-500 rounded-full border-4 border-white shadow-md mt-1"></div>
+                  <div>
+                    <p className="font-black text-slate-900 tracking-tight">SOS Received</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1">{timeSince(alert.timestamp)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-6 relative z-10">
+                  <div className="w-6 h-6 bg-blue-500 rounded-full border-4 border-white shadow-md mt-1"></div>
+                  <div>
+                    <p className="font-black text-slate-900 tracking-tight">Units Mobilized</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1">Automatic Dispatch Initialized</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-6 relative z-10">
+                  <div className="w-6 h-6 bg-slate-200 rounded-full border-4 border-white shadow-md mt-1"></div>
+                  <div className="opacity-40">
+                    <p className="font-black text-slate-900 tracking-tight">Rescue Operation Finalized</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1">Awaiting Field Confirmation</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="grid md:grid-cols-2 gap-6 mb-6">
-              <div className="space-y-4">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Victim Information</h2>
-
-                <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
-                  <User className="w-5 h-5 text-gray-400 mt-1" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Name</p>
-                    <p className="text-lg font-semibold text-gray-900">{alert.victimName}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
-                  <Activity className="w-5 h-5 text-gray-400 mt-1" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Age</p>
-                    <p className="text-lg font-semibold text-gray-900">{alert.age} years old</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <Activity className="w-5 h-5 text-orange-600 mt-1" />
-                  <div>
-                    <p className="text-sm font-medium text-orange-600">Condition</p>
-                    <p className="text-gray-900 font-medium">{alert.condition}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Location Details</h2>
-
-                <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
-                  <MapPin className="w-5 h-5 text-gray-400 mt-1" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Address</p>
-                    <p className="text-gray-900 font-medium">{alert.location}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
-                  <Navigation className="w-5 h-5 text-gray-400 mt-1" />
-                  <div>
-                    <p className="text-sm font-medium text-gray-500">Coordinates</p>
-                    <p className="text-gray-900 font-mono text-sm">
-                      {alert.coordinates.lat.toFixed(4)}, {alert.coordinates.lng.toFixed(4)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-                  <div className="bg-gradient-to-br from-gray-100 to-gray-200 h-32 rounded-lg flex items-center justify-center">
-                    <MapPin className="w-12 h-12 text-blue-600" />
-                  </div>
-                  <p className="text-center text-sm text-gray-600 mt-2">Map view simulation</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 pt-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Response Actions</h2>
-
-              <div className="grid md:grid-cols-2 gap-4">
+          {/* Response Controls Column */}
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-slate-900 rounded-[3rem] p-8 md:p-10 text-white shadow-2xl shadow-slate-300">
+              <h2 className="text-2xl font-black italic tracking-tighter mb-8 border-b border-white/10 pb-4">Command</h2>
+              
+              <div className="grid grid-cols-1 gap-4">
                 <button
-                  onClick={() => handleAction('Location shared with all rescue teams')}
-                  className="flex items-center justify-center space-x-2 bg-blue-600 text-white py-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                  onClick={() => handleAction('Dispatching nearest units...')}
+                  className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-red-600 hover:border-red-500 transition-all"
                 >
-                  <Navigation className="w-5 h-5" />
-                  <span>Share Location</span>
-                </button>
-
-                <button
-                  onClick={() => handleAction('Rescue team Alpha assigned to this emergency')}
-                  className="flex items-center justify-center space-x-2 bg-green-600 text-white py-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
-                >
-                  <Users className="w-5 h-5" />
-                  <span>Assign Team</span>
-                </button>
-
-                <button
-                  onClick={() => handleAction('Emergency medical services notified')}
-                  className="flex items-center justify-center space-x-2 bg-red-600 text-white py-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
-                >
-                  <Activity className="w-5 h-5" />
-                  <span>Request Medical Aid</span>
-                </button>
-
-                <button
-                  onClick={() => handleAction('Updated victim status in system')}
-                  className="flex items-center justify-center space-x-2 bg-gray-700 text-white py-4 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  <span>Update Status</span>
-                </button>
-              </div>
-            </div>
-
-            <div className="border-t border-gray-200 mt-6 pt-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Timeline</h2>
-              <div className="space-y-3">
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-red-600 rounded-full mt-2"></div>
-                  <div>
-                    <p className="font-medium text-gray-900">SOS Alert Received</p>
-                    <p className="text-sm text-gray-500">{timeSince(alert.timestamp)}</p>
-                  </div>
-                </div>
-                {alert.status !== 'pending' && (
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                    <div>
-                      <p className="font-medium text-gray-900">Team Assigned</p>
-                      <p className="text-sm text-gray-500">
-                        {timeSince(new Date(alert.timestamp.getTime() + 5 * 60000))}
-                      </p>
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 p-3 rounded-2xl group-hover:bg-white/20">
+                      <Navigation className="w-6 h-6 text-red-500 group-hover:text-white" />
                     </div>
+                    <span className="font-black text-xs uppercase tracking-widest">Share Location</span>
                   </div>
-                )}
+                  <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100" />
+                </button>
+
+                <button
+                  onClick={() => handleAction('Assigning Rescue Team Alpha...')}
+                  className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-blue-600 hover:border-blue-500 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 p-3 rounded-2xl group-hover:bg-white/20">
+                      <Users className="w-6 h-6 text-blue-500 group-hover:text-white" />
+                    </div>
+                    <span className="font-black text-xs uppercase tracking-widest">Assign Team</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100" />
+                </button>
+
+                <button
+                  onClick={() => handleAction('EMS notified for immediate support...')}
+                  className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-emerald-600 hover:border-emerald-500 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 p-3 rounded-2xl group-hover:bg-white/20">
+                      <Shield className="w-6 h-6 text-emerald-500 group-hover:text-white" />
+                    </div>
+                    <span className="font-black text-xs uppercase tracking-widest">Med-Aid Call</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100" />
+                </button>
+
+                <button
+                  onClick={() => handleAction('Mission status updated to in-progress...')}
+                  className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-slate-700 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/10 p-3 rounded-2xl group-hover:bg-white/20">
+                      <Share2 className="w-6 h-6 text-slate-400 group-hover:text-white" />
+                    </div>
+                    <span className="font-black text-xs uppercase tracking-widest">Broadcast Log</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-30 group-hover:opacity-100" />
+                </button>
               </div>
+              
+              <button
+                className="w-full mt-10 py-5 bg-red-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-red-900/50 hover:bg-red-700 transition-all active:scale-95"
+              >
+                FINALIZE RESCUE
+              </button>
             </div>
           </div>
         </div>
@@ -221,3 +275,4 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Upload, CheckCircle } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle, MapPin, Info, Send } from 'lucide-react';
 import { IncidentType } from '../types';
 
 interface ReportIncidentFormProps {
@@ -15,12 +15,12 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
-  const incidentTypes: { value: IncidentType; label: string; color: string }[] = [
-    { value: 'fire', label: 'Fire', color: 'bg-red-500' },
-    { value: 'flood', label: 'Flood', color: 'bg-blue-500' },
-    { value: 'earthquake', label: 'Earthquake', color: 'bg-yellow-500' },
-    { value: 'medical', label: 'Medical Emergency', color: 'bg-green-500' },
-    { value: 'other', label: 'Other', color: 'bg-gray-500' },
+  const incidentTypes: { value: IncidentType; label: string; color: string; icon: any }[] = [
+    { value: 'fire', label: 'Fire', color: 'bg-red-500', icon: '🔥' },
+    { value: 'flood', label: 'Flood', color: 'bg-blue-500', icon: '🌊' },
+    { value: 'earthquake', label: 'Earthquake', color: 'bg-orange-500', icon: '🏘️' },
+    { value: 'medical', label: 'Medical', color: 'bg-emerald-500', icon: '🚑' },
+    { value: 'other', label: 'Other', color: 'bg-slate-500', icon: '❓' },
   ];
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,17 +39,19 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
     setSubmitted(true);
     setTimeout(() => {
       onClose();
-    }, 2000);
+    }, 2500);
   };
 
   if (submitted) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center animate-scale-in">
-          <CheckCircle className="w-20 h-20 text-green-500 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">Report Submitted!</h3>
-          <p className="text-gray-600">
-            Emergency teams have been notified and will respond shortly.
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+        <div className="bg-white rounded-[3rem] p-12 max-w-md w-full text-center shadow-2xl animate-scale-in border border-slate-100">
+          <div className="bg-emerald-50 w-24 h-24 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8">
+            <CheckCircle className="w-12 h-12 text-emerald-500" />
+          </div>
+          <h3 className="text-3xl font-black text-slate-900 mb-4 tracking-tight italic">Report Live!</h3>
+          <p className="text-slate-500 font-medium leading-relaxed">
+            Emergency teams have been dispatched to the coordinates provided. Stay safe and wait for instructions.
           </p>
         </div>
       </div>
@@ -57,74 +59,89 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-2xl p-6 max-w-2xl w-full my-8 animate-scale-in">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">Report Incident</h3>
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4 z-[100] overflow-y-auto">
+      <div className="bg-white rounded-t-[3rem] md:rounded-[3rem] p-8 md:p-10 max-w-2xl w-full shadow-2xl animate-slide-up border border-slate-100">
+        <div className="flex items-center justify-between mb-10">
+          <div>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tight">Report Incident</h3>
+            <p className="text-slate-400 font-medium text-sm mt-1">Provide accurate details for faster response.</p>
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="bg-slate-100 p-3 rounded-2xl text-slate-400 hover:text-slate-600 transition-all hover:rotate-90"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              Incident Type *
+            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
+              <Info className="w-4 h-4" /> Incident Type
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
               {incidentTypes.map((type) => (
                 <button
                   key={type.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, type: type.value })}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all duration-300 ${
                     formData.type === type.value
-                      ? `${type.color} text-white border-transparent`
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-gray-300'
+                      ? `${type.color.replace('bg-', 'border-')} ${type.color.replace('bg-', 'bg-')}/10 shadow-lg scale-105`
+                      : 'bg-white border-slate-100 hover:border-slate-200'
                   }`}
                 >
-                  {type.label}
+                  <span className="text-2xl">{type.icon}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-tighter ${
+                    formData.type === type.value ? type.color.replace('bg-', 'text-') : 'text-slate-400'
+                  }`}>
+                    {type.label}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
+          {/* Location */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Location *
+            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
+              <MapPin className="w-4 h-4" /> Location Information
             </label>
-            <input
-              type="text"
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="Enter street address or landmark"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all"
-              required
-            />
+            <div className="relative group">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300 group-focus-within:text-orange-500 transition-colors" />
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                placeholder="Where is this happening?"
+                className="w-full pl-12 pr-4 py-5 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-bold placeholder:font-medium placeholder:text-slate-300"
+                required
+              />
+            </div>
           </div>
 
+          {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
+            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
+              <AlertCircle className="w-4 h-4" /> Description & Severity
             </label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Provide details about the incident (injuries, severity, people involved, etc.)"
+              placeholder="What's happening? (e.g., casualties, trapped people, spreading fast...)"
               rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none transition-all resize-none"
+              className="w-full px-6 py-5 bg-slate-50 border border-slate-200 rounded-[2rem] outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all font-medium placeholder:text-slate-300 resize-none"
               required
             />
           </div>
 
+          {/* Image Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Upload Photo (Optional)
+            <label className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
+              <Upload className="w-4 h-4" /> Attach Evidence (Optional)
             </label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-500 transition-colors">
+            <div className="relative">
               <input
                 type="file"
                 accept="image/*"
@@ -133,44 +150,43 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
                 id="image-upload"
               />
               {imagePreview ? (
-                <div className="relative">
+                <div className="relative group rounded-[2rem] overflow-hidden border-4 border-slate-50 shadow-xl">
                   <img
                     src={imagePreview}
                     alt="Preview"
-                    className="max-h-48 mx-auto rounded-lg"
+                    className="w-full h-48 object-cover"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setImagePreview(null)}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      type="button"
+                      onClick={() => setImagePreview(null)}
+                      className="bg-red-500 text-white p-3 rounded-2xl shadow-xl hover:bg-red-600 transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <label htmlFor="image-upload" className="cursor-pointer">
-                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">Click to upload image</p>
-                  <p className="text-sm text-gray-400 mt-1">PNG, JPG up to 10MB</p>
+                <label
+                  htmlFor="image-upload"
+                  className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-200 rounded-[2.5rem] cursor-pointer hover:bg-slate-50 hover:border-orange-500 transition-all group"
+                >
+                  <div className="bg-slate-50 p-4 rounded-2xl group-hover:bg-orange-50 transition-colors">
+                    <Upload className="w-8 h-8 text-slate-300 group-hover:text-orange-500" />
+                  </div>
+                  <p className="mt-3 text-sm font-black text-slate-400 uppercase tracking-widest group-hover:text-orange-600">Add Photos</p>
                 </label>
               )}
             </div>
           </div>
 
-          <div className="flex space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
+          <div className="flex gap-4 pt-4">
             <button
               type="submit"
               disabled={!formData.type || !formData.location || !formData.description}
-              className="flex-1 bg-orange-600 text-white py-3 rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              className="flex-1 bg-orange-600 text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-orange-100 hover:bg-orange-700 transition-all active:scale-95 disabled:bg-slate-200 disabled:shadow-none disabled:cursor-not-allowed"
             >
-              Submit Report
+              Dispatch Report <Send className="w-5 h-5" />
             </button>
           </div>
         </form>
@@ -178,3 +194,4 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
     </div>
   );
 }
+
