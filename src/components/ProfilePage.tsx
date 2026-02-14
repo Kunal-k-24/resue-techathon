@@ -1,51 +1,82 @@
-import { User, Mail, Phone, MapPin, Award, Calendar, Shield, Edit3, Heart, Activity, Info } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Mail, Phone, MapPin, Award, Calendar, Shield, Edit3, Heart, Activity, Info, Loader2 } from 'lucide-react';
 import { UserRole } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface ProfilePageProps {
   userRole: UserRole;
 }
 
 export default function ProfilePage({ userRole }: ProfilePageProps) {
-  const profiles = {
-    civilian: {
-      name: 'John Doe',
-      email: 'john.doe@email.com',
-      phone: '+1 (555) 123-4567',
-      location: 'Downtown District',
-      joinDate: 'January 2024',
-      stats: [
-        { label: 'Reports Submitted', value: '3', icon: <Activity className="w-5 h-5" /> },
-        { label: 'Shelters Visited', value: '1', icon: <MapPin className="w-5 h-5" /> },
-        { label: 'Alerts Received', value: '12', icon: <Shield className="w-5 h-5" /> },
-      ],
-    },
-    volunteer: {
-      name: 'Sarah Johnson',
-      email: 'sarah.j@email.com',
-      phone: '+1 (555) 234-5678',
-      location: 'Central Zone',
-      joinDate: 'November 2023',
-      stats: [
-        { label: 'Tasks Completed', value: '27', icon: <Award className="w-5 h-5" /> },
-        { label: 'Hours Volunteered', value: '156', icon: <Calendar className="w-5 h-5" /> },
-        { label: 'People Helped', value: '89', icon: <Heart className="w-5 h-5" /> },
-      ],
-    },
-    'rescue-team': {
-      name: 'Captain Mike Roberts',
-      email: 'mike.roberts@rescue.org',
-      phone: '+1 (555) 345-6789',
-      location: 'Emergency HQ',
-      joinDate: 'March 2020',
-      stats: [
-        { label: 'Missions Completed', value: '143', icon: <Award className="w-5 h-5" /> },
-        { label: 'Lives Saved', value: '312', icon: <Heart className="w-5 h-5" /> },
-        { label: 'Team Members', value: '8', icon: <User className="w-5 h-5" /> },
-      ],
-    },
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [userRole]);
+
+  const fetchProfile = async () => {
+    try {
+      // In a real app, we'd use the authenticated user ID.
+      // For this hackathon project, we'll fetch the first profile matching the role
+      // or create one if it doesn't exist.
+      let { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', userRole)
+        .limit(1)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // No profile found, create a mock one
+        const newProfile = {
+          role: userRole,
+          full_name: userRole === 'volunteer' ? 'Sarah Johnson' : userRole === 'rescue-team' ? 'Captain Mike Roberts' : 'John Doe',
+          email: `${userRole}@example.com`,
+          phone: '+1 (555) 000-0000',
+          location: 'City Center',
+          join_date: new Date().toISOString()
+        };
+        const { data: createdData } = await supabase.from('profiles').insert(newProfile).select().single();
+        data = createdData;
+      }
+
+      // Fetch dynamic stats
+      const stats = await fetchDynamicStats(data?.id);
+      setProfile({ ...data, dynamicStats: stats });
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const profile = profiles[userRole as keyof typeof profiles];
+  const fetchDynamicStats = async (profileId: string) => {
+    if (!profileId) return [];
+    
+    if (userRole === 'civilian') {
+      const { count: reportCount } = await supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('reporter_id', profileId);
+      return [
+        { label: 'Reports Submitted', value: reportCount || 0, icon: <Activity className="w-5 h-5" /> },
+        { label: 'Shelters Nearby', value: '12', icon: <MapPin className="w-5 h-5" /> },
+        { label: 'Alerts Received', value: '5', icon: <Shield className="w-5 h-5" /> },
+      ];
+    } else if (userRole === 'volunteer') {
+      const { count: taskCount } = await supabase.from('tasks').select('*', { count: 'exact', head: true }).eq('assigned_to', profileId).eq('status', 'completed');
+      return [
+        { label: 'Missions Finished', value: taskCount || 0, icon: <Award className="w-5 h-5" /> },
+        { label: 'Community Rating', value: '4.9', icon: <Heart className="w-5 h-5" /> },
+        { label: 'Active Hours', value: '24', icon: <Calendar className="w-5 h-5" /> },
+      ];
+    } else {
+      const { count: rescueCount } = await supabase.from('incidents').select('*', { count: 'exact', head: true }).eq('status', 'resolved');
+      return [
+        { label: 'Team Operations', value: rescueCount || 0, icon: <Award className="w-5 h-5" /> },
+        { label: 'Lives Impacted', value: '150+', icon: <Heart className="w-5 h-5" /> },
+        { label: 'Active Personnel', value: '12', icon: <User className="w-5 h-5" /> },
+      ];
+    }
+  };
 
   const getRoleBadge = () => {
     switch (userRole) {
@@ -59,6 +90,14 @@ export default function ProfilePage({ userRole }: ProfilePageProps) {
         return { color: 'bg-slate-100 text-slate-700', label: 'User' };
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-slate-800 animate-spin" />
+      </div>
+    );
+  }
 
   const badge = getRoleBadge();
 
@@ -86,13 +125,13 @@ export default function ProfilePage({ userRole }: ProfilePageProps) {
               <div className="flex-1 text-center md:text-left">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{profile.name}</h1>
+                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">{profile.full_name}</h1>
                     <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
                       <span className={`px-4 py-1 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm ${badge.color}`}>
                         {badge.label}
                       </span>
                       <span className="px-4 py-1 rounded-xl text-xs font-black uppercase tracking-widest bg-slate-100 text-slate-500 shadow-sm flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> Joined {profile.joinDate.split(' ')[1]}
+                        <Calendar className="w-3 h-3" /> Joined {new Date(profile.join_date).getFullYear()}
                       </span>
                     </div>
                   </div>
@@ -158,7 +197,7 @@ export default function ProfilePage({ userRole }: ProfilePageProps) {
               {/* Right Column: Stats */}
               <div className="lg:col-span-5 space-y-6">
                 <h2 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Your Impact</h2>
-                {profile.stats.map((stat, index) => (
+                {profile.dynamicStats.map((stat: any, index: number) => (
                   <div key={index} className="relative group overflow-hidden p-8 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
                     <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover:scale-150 transition-transform duration-700">
                       {stat.icon}

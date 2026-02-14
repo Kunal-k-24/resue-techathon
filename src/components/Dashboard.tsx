@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, Plus, MapPin, Activity, Shield, ArrowRight, Info, HeartPulse } from 'lucide-react';
 import { UserRole } from '../types';
 import ReportIncidentForm from './ReportIncidentForm';
-import { mockShelters, mockTasks } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 
 interface DashboardProps {
   userRole: UserRole;
@@ -13,18 +13,74 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
   const [showSOSConfirm, setShowSOSConfirm] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [sosTriggered, setSosTriggered] = useState(false);
+  const [shelters, setShelters] = useState<any[]>([]);
+  const [urgentTasks, setUrgentTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+
+    // Set up real-time subscriptions
+    const sheltersSubscription = supabase
+      .channel('shelters-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shelters' }, () => fetchData())
+      .subscribe();
+
+    const tasksSubscription = supabase
+      .channel('tasks-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(sheltersSubscription);
+      supabase.removeChannel(tasksSubscription);
+    };
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const { data: sheltersData } = await supabase
+        .from('shelters')
+        .select('*')
+        .limit(4);
+      
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('status', 'urgent')
+        .limit(3);
+
+      if (sheltersData) setShelters(sheltersData);
+      if (tasksData) setUrgentTasks(tasksData);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSOSClick = () => {
     setShowSOSConfirm(true);
   };
 
-  const confirmSOS = () => {
-    setSosTriggered(true);
-    setShowSOSConfirm(false);
-    setTimeout(() => setSosTriggered(false), 5000);
-  };
+  const confirmSOS = async () => {
+    try {
+      // Create an incident record for the SOS
+      await supabase.from('incidents').insert({
+        type: 'sos',
+        description: 'Emergency SOS triggered from dashboard',
+        location_name: 'User Current Location',
+        urgency: 'critical',
+        status: 'pending'
+      });
 
-  const urgentTasks = mockTasks.filter(t => t.status === 'urgent');
+      setSosTriggered(true);
+      setShowSOSConfirm(false);
+      setTimeout(() => setSosTriggered(false), 8000);
+    } catch (error) {
+      console.error('Error triggering SOS:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-32 md:pb-12">
@@ -134,7 +190,11 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
               </div>
             </div>
             <div className="space-y-4">
-              {mockShelters.map((shelter) => (
+              {loading ? (
+                <div className="flex justify-center p-8">
+                  <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+                </div>
+              ) : shelters.map((shelter) => (
                 <div
                   key={shelter.id}
                   className="group flex items-center justify-between p-4 rounded-3xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all cursor-pointer"
@@ -180,7 +240,11 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
                 </div>
               </div>
               <div className="space-y-4">
-                {urgentTasks.map((task) => (
+                {loading ? (
+                  <div className="flex justify-center p-8">
+                    <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+                  </div>
+                ) : urgentTasks.map((task) => (
                   <div
                     key={task.id}
                     className="p-5 rounded-3xl bg-slate-50 border border-slate-100 hover:border-red-200 transition-all cursor-pointer"

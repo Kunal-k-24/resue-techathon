@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, Upload, CheckCircle, AlertCircle, MapPin, Info, Send } from 'lucide-react';
 import { IncidentType } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface ReportIncidentFormProps {
   onClose: () => void;
@@ -14,6 +15,7 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
   });
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const incidentTypes: { value: IncidentType; label: string; color: string; icon: any }[] = [
     { value: 'fire', label: 'Fire', color: 'bg-red-500', icon: '🔥' },
@@ -34,12 +36,32 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      onClose();
-    }, 2500);
+    if (!formData.type || !formData.location || !formData.description) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('incidents').insert({
+        type: formData.type,
+        description: formData.description,
+        location_name: formData.location,
+        status: 'pending',
+        urgency: formData.type === 'medical' ? 'high' : 'medium'
+      });
+
+      if (error) throw error;
+
+      setSubmitted(true);
+      setTimeout(() => {
+        onClose();
+      }, 2500);
+    } catch (error) {
+      console.error('Error submitting incident:', error);
+      alert('Failed to submit report. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (submitted) {
@@ -183,10 +205,10 @@ export default function ReportIncidentForm({ onClose }: ReportIncidentFormProps)
           <div className="flex gap-4 pt-4">
             <button
               type="submit"
-              disabled={!formData.type || !formData.location || !formData.description}
+              disabled={loading || !formData.type || !formData.location || !formData.description}
               className="flex-1 bg-orange-600 text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-orange-100 hover:bg-orange-700 transition-all active:scale-95 disabled:bg-slate-200 disabled:shadow-none disabled:cursor-not-allowed"
             >
-              Dispatch Report <Send className="w-5 h-5" />
+              {loading ? 'Processing...' : 'Dispatch Report'} <Send className="w-5 h-5" />
             </button>
           </div>
         </form>

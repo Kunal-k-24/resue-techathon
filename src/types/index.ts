@@ -1,4 +1,4 @@
-export type UserRole = 'civilian' | 'volunteer' | 'rescue-team' | null;
+export type UserRole = 'civilian' | 'volunteer' | 'rescue-team' | 'admin' | null;
 
 export type IncidentType = 'fire' | 'flood' | 'earthquake' | 'medical' | 'other';
 

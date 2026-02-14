@@ -1,17 +1,55 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Clock, CheckCircle, Info, Loader2, ArrowRight, Filter, Search } from 'lucide-react';
-import { mockTasks } from '../data/mockData';
+import { supabase } from '../lib/supabase';
 import { Task, TaskStatus } from '../types';
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [filter, setFilter] = useState<TaskStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(tasks.map(task =>
-      task.id === taskId ? { ...task, status: newStatus } : task
-    ));
+  useEffect(() => {
+    fetchTasks();
+
+    const subscription = supabase
+      .channel('tasks-all')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchTasks())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) setTasks(data as Task[]);
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', taskId);
+
+      if (error) throw error;
+      // State will update via real-time subscription
+    } catch (error) {
+      console.error('Error updating task status:', error);
+    }
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -76,7 +114,11 @@ export default function TasksPage() {
 
         {/* Tasks List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredTasks.map((task) => (
+          {loading ? (
+            <div className="col-span-full flex justify-center py-20">
+              <Loader2 className="w-12 h-12 text-slate-300 animate-spin" />
+            </div>
+          ) : filteredTasks.map((task) => (
             <div
               key={task.id}
               className="group bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"

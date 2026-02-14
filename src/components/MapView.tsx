@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Flame, Droplets, Home, Cross, AlertCircle, X, Navigation, Filter, MapPin, Compass } from 'lucide-react';
-import { mockMapMarkers } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import { Flame, Droplets, Home, Cross, AlertCircle, X, Navigation, Filter, MapPin, Compass, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { MapMarker, MarkerType } from '../types';
 
 interface MapViewProps {
@@ -8,42 +8,81 @@ interface MapViewProps {
 }
 
 export default function MapView({ onNavigate }: MapViewProps) {
+  const [markers, setMarkers] = useState<MapMarker[]>([]);
   const [selectedMarker, setSelectedMarker] = useState<MapMarker | null>(null);
   const [filterType, setFilterType] = useState<MarkerType | 'all'>('all');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMarkers();
+
+    const subscription = supabase
+      .channel('map-markers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => fetchMarkers())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shelters' }, () => fetchMarkers())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  const fetchMarkers = async () => {
+    try {
+      const { data: incidents } = await supabase.from('incidents').select('*');
+      const { data: shelters } = await supabase.from('shelters').select('*');
+
+      const mapMarkers: MapMarker[] = [
+        ...(incidents || []).map(i => ({
+          id: i.id,
+          type: i.type as MarkerType,
+          name: i.type.toUpperCase() + ' Incident',
+          location: i.location_name,
+          description: i.description,
+          coordinates: { lat: i.location_lat || 40.7128, lng: i.location_lng || -74.0060 }
+        })),
+        ...(shelters || []).map(s => ({
+          id: s.id,
+          type: 'shelter' as MarkerType,
+          name: s.name,
+          location: s.address,
+          description: `Capacity: ${s.capacity}, Available: ${s.available}`,
+          capacity: s.capacity,
+          coordinates: { lat: s.location_lat || 40.7300, lng: s.location_lng || -73.9352 }
+        }))
+      ];
+
+      setMarkers(mapMarkers);
+    } catch (error) {
+      console.error('Error fetching map markers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getMarkerIcon = (type: MarkerType) => {
     switch (type) {
-      case 'fire':
-        return <Flame className="w-5 h-5" />;
-      case 'flood':
-        return <Droplets className="w-5 h-5" />;
-      case 'shelter':
-        return <Home className="w-5 h-5" />;
-      case 'hospital':
-        return <Cross className="w-5 h-5" />;
-      case 'sos':
-        return <AlertCircle className="w-5 h-5" />;
+      case 'fire': return <Flame className="w-5 h-5" />;
+      case 'flood': return <Droplets className="w-5 h-5" />;
+      case 'shelter': return <Home className="w-5 h-5" />;
+      case 'hospital': return <Cross className="w-5 h-5" />;
+      case 'sos': return <AlertCircle className="w-5 h-5" />;
     }
   };
 
   const getMarkerColor = (type: MarkerType) => {
     switch (type) {
-      case 'fire':
-        return 'bg-red-500 text-white ring-4 ring-red-500/20 animate-pulse';
-      case 'flood':
-        return 'bg-blue-500 text-white ring-4 ring-blue-500/20';
-      case 'shelter':
-        return 'bg-emerald-500 text-white ring-4 ring-emerald-500/20';
-      case 'hospital':
-        return 'bg-teal-500 text-white ring-4 ring-teal-500/20';
-      case 'sos':
-        return 'bg-orange-500 text-white ring-4 ring-orange-500/20 animate-pulse';
+      case 'fire': return 'bg-red-500 text-white ring-4 ring-red-500/20 animate-pulse';
+      case 'flood': return 'bg-blue-500 text-white ring-4 ring-blue-500/20';
+      case 'shelter': return 'bg-emerald-500 text-white ring-4 ring-emerald-500/20';
+      case 'hospital': return 'bg-teal-500 text-white ring-4 ring-teal-500/20';
+      case 'sos': return 'bg-orange-500 text-white ring-4 ring-orange-500/20 animate-pulse';
     }
   };
 
   const filteredMarkers = filterType === 'all'
-    ? mockMapMarkers
-    : mockMapMarkers.filter(m => m.type === filterType);
+    ? markers
+    : markers.filter(m => m.type === filterType);
 
   const filterOptions: { value: MarkerType | 'all'; label: string; icon: any }[] = [
     { value: 'all', label: 'All', icon: Filter },
@@ -110,7 +149,11 @@ export default function MapView({ onNavigate }: MapViewProps) {
           </div>
 
           {/* Markers */}
-          {filteredMarkers.map((marker, index) => (
+          {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-sm z-30">
+              <Loader2 className="w-10 h-10 text-slate-800 animate-spin" />
+            </div>
+          ) : filteredMarkers.map((marker, index) => (
             <button
               key={marker.id}
               onClick={() => setSelectedMarker(marker)}
@@ -118,8 +161,8 @@ export default function MapView({ onNavigate }: MapViewProps) {
                 marker.type
               )}`}
               style={{
-                left: `${25 + (index * 18) % 55}%`,
-                top: `${20 + (index * 22) % 60}%`,
+                left: `${25 + (index * 12) % 60}%`,
+                top: `${20 + (index * 15) % 65}%`,
               }}
             >
               {getMarkerIcon(marker.type)}

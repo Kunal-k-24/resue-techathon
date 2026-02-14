@@ -1,19 +1,84 @@
-import { useState } from 'react';
-import { ArrowLeft, MapPin, Clock, User, Activity, Navigation, Users, CheckCircle, AlertCircle, Shield, ChevronRight, Share2 } from 'lucide-react';
-import { mockSOSAlerts } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, MapPin, Clock, User, Activity, Navigation, Users, CheckCircle, AlertCircle, Shield, ChevronRight, Share2, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface SOSDetailPageProps {
   onNavigate: (page: string) => void;
 }
 
 export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
-  const [alert] = useState(mockSOSAlerts[0]);
+  const [alert, setAlert] = useState<any>(null);
   const [actionTaken, setActionTaken] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleAction = (action: string) => {
-    setActionTaken(action);
-    setTimeout(() => setActionTaken(null), 3000);
+  useEffect(() => {
+    fetchAlertDetail();
+
+    const subscription = supabase
+      .channel('sos-detail')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'incidents' }, () => fetchAlertDetail())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
+
+  const fetchAlertDetail = async () => {
+    try {
+      // For demo/hackathon, we fetch the most recent SOS incident
+      const { data, error } = await supabase
+        .from('incidents')
+        .select('*')
+        .eq('type', 'sos')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) throw error;
+      setAlert(data);
+    } catch (error) {
+      console.error('Error fetching SOS detail:', error);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleAction = async (action: string, newStatus?: string) => {
+    if (!alert) return;
+    
+    try {
+      if (newStatus) {
+        await supabase
+          .from('incidents')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', alert.id);
+      }
+
+      setActionTaken(action);
+      setTimeout(() => setActionTaken(null), 3000);
+    } catch (error) {
+      console.error('Error performing action:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-slate-800 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!alert) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <AlertCircle className="w-16 h-16 text-slate-300 mb-4" />
+        <h3 className="text-xl font-black text-slate-900">No SOS Transmission Found</h3>
+        <button onClick={() => onNavigate('map')} className="mt-6 text-red-600 font-bold">Return to Map</button>
+      </div>
+    );
+  }
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
@@ -99,7 +164,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                   <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter mb-4">SOS DISTRESS</h1>
                   <div className="flex items-center gap-2 text-white/80 font-bold text-sm">
                     <Clock className="w-4 h-4" />
-                    Broadcasted {timeSince(alert.timestamp)}
+                    Broadcasted {timeSince(new Date(alert.created_at))}
                   </div>
                 </div>
               </div>
@@ -118,7 +183,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                         </div>
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Name</p>
-                          <p className="text-xl font-black text-slate-900 tracking-tight">{alert.victimName}</p>
+                          <p className="text-xl font-black text-slate-900 tracking-tight">{alert.reporter_name || 'Anonymous Victim'}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-4 p-5 bg-slate-50 rounded-[2rem] border border-slate-100 group hover:bg-white hover:border-slate-200 transition-all">
@@ -127,7 +192,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                         </div>
                         <div>
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Vitals / Age</p>
-                          <p className="text-xl font-black text-slate-900 tracking-tight">{alert.age}y • Stable</p>
+                          <p className="text-xl font-black text-slate-900 tracking-tight">{alert.age || '??'}y • Active</p>
                         </div>
                       </div>
                       <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100">
@@ -151,7 +216,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">Address</p>
-                          <p className="text-sm font-bold text-slate-700 truncate">{alert.location}</p>
+                          <p className="text-sm font-bold text-slate-700 truncate">{alert.location_name}</p>
                         </div>
                       </div>
                       <div className="relative rounded-[2.5rem] overflow-hidden border-4 border-slate-100 shadow-xl h-48 group">
@@ -160,7 +225,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                          </div>
                          <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur-sm p-3 rounded-2xl border border-white/50 flex items-center justify-between">
                             <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">
-                               {alert.coordinates.lat.toFixed(4)}, {alert.coordinates.lng.toFixed(4)}
+                               {alert.location_lat?.toFixed(4) || '0.0000'}, {alert.location_lng?.toFixed(4) || '0.0000'}
                             </span>
                             <Navigation className="w-4 h-4 text-blue-500" />
                          </div>
@@ -181,7 +246,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                   <div className="w-6 h-6 bg-red-500 rounded-full border-4 border-white shadow-md mt-1"></div>
                   <div>
                     <p className="font-black text-slate-900 tracking-tight">SOS Received</p>
-                    <p className="text-xs font-bold text-slate-400 mt-1">{timeSince(alert.timestamp)}</p>
+                    <p className="text-xs font-bold text-slate-400 mt-1">{timeSince(new Date(alert.created_at))}</p>
                   </div>
                 </div>
 
@@ -211,7 +276,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
               
               <div className="grid grid-cols-1 gap-4">
                 <button
-                  onClick={() => handleAction('Dispatching nearest units...')}
+                  onClick={() => handleAction('Dispatching nearest units...', 'responding')}
                   className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-red-600 hover:border-red-500 transition-all"
                 >
                   <div className="flex items-center gap-4">
@@ -224,7 +289,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                 </button>
 
                 <button
-                  onClick={() => handleAction('Assigning Rescue Team Alpha...')}
+                  onClick={() => handleAction('Assigning Rescue Team Alpha...', 'responding')}
                   className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-blue-600 hover:border-blue-500 transition-all"
                 >
                   <div className="flex items-center gap-4">
@@ -237,7 +302,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                 </button>
 
                 <button
-                  onClick={() => handleAction('EMS notified for immediate support...')}
+                  onClick={() => handleAction('EMS notified for immediate support...', 'responding')}
                   className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-emerald-600 hover:border-emerald-500 transition-all"
                 >
                   <div className="flex items-center gap-4">
@@ -250,7 +315,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
                 </button>
 
                 <button
-                  onClick={() => handleAction('Mission status updated to in-progress...')}
+                  onClick={() => handleAction('Mission status updated to resolved...', 'resolved')}
                   className="group flex items-center justify-between p-5 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-slate-700 transition-all"
                 >
                   <div className="flex items-center gap-4">
@@ -264,6 +329,7 @@ export default function SOSDetailPage({ onNavigate }: SOSDetailPageProps) {
               </div>
               
               <button
+                onClick={() => handleAction('Rescue operation marked as finalized.', 'resolved')}
                 className="w-full mt-10 py-5 bg-red-600 text-white rounded-[2rem] font-black text-lg shadow-xl shadow-red-900/50 hover:bg-red-700 transition-all active:scale-95"
               >
                 FINALIZE RESCUE

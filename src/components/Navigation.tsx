@@ -1,18 +1,20 @@
 import { Home, Map, ListTodo, User, LogOut, Bell, Shield } from 'lucide-react';
+import { UserRole } from '../types';
 
 interface NavigationProps {
   currentPage: string;
   onNavigate: (page: string) => void;
   onLogout: () => void;
+  userRole: UserRole;
 }
 
-export default function Navigation({ currentPage, onNavigate, onLogout }: NavigationProps) {
+export default function Navigation({ currentPage, onNavigate, onLogout, userRole }: NavigationProps) {
   const navItems = [
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'map', icon: Map, label: 'Map' },
-    { id: 'tasks', icon: ListTodo, label: 'Tasks' },
-    { id: 'profile', icon: User, label: 'Profile' },
-  ];
+    { id: 'home', icon: Home, label: 'Home', show: true },
+    { id: 'map', icon: Map, label: 'Map', show: true },
+    { id: 'tasks', icon: ListTodo, label: 'Tasks', show: userRole !== 'civilian' },
+    { id: 'profile', icon: User, label: 'Profile', show: true },
+  ].filter(item => item.show);
 
   return (
     <>
