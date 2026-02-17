@@ -1,6 +1,6 @@
-export type UserRole = 'civilian' | 'volunteer' | 'rescue-team' | 'admin' | null;
+export type UserRole = 'civilian' | 'volunteer' | 'admin' | null;
 
-export type IncidentType = 'fire' | 'flood' | 'earthquake' | 'medical' | 'other';
+export type IncidentType = 'fire' | 'flood' | 'earthquake' | 'medical' | 'other' | 'sos' | 'storm';
 
 export type TaskStatus = 'urgent' | 'in-progress' | 'completed';
 

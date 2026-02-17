@@ -110,21 +110,31 @@ export default function AuthModal({ onClose }: AuthModalProps) {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Account Type</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {['civilian', 'volunteer', 'rescue-team'].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setRole(r as UserRole)}
-                      className={`py-3 px-4 rounded-xl text-xs font-black uppercase tracking-widest border-2 transition-all ${
-                        role === r
-                          ? 'bg-slate-900 border-slate-900 text-white shadow-lg scale-105'
-                          : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'
-                      }`}
-                    >
-                      {r.replace('-', ' ')}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setRole('civilian')}
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                      role === 'civilian'
+                        ? 'border-red-500 bg-red-50 text-red-600'
+                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
+                    }`}
+                  >
+                    <User className="w-6 h-6" />
+                    <span className="text-xs font-black uppercase tracking-wider">Civilian</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('volunteer')}
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                      role === 'volunteer'
+                        ? 'border-red-500 bg-red-50 text-red-600'
+                        : 'border-slate-100 bg-slate-50 text-slate-400 hover:border-slate-200'
+                    }`}
+                  >
+                    <Shield className="w-6 h-6" />
+                    <span className="text-xs font-black uppercase tracking-wider">Volunteer</span>
+                  </button>
                 </div>
               </div>
             </>

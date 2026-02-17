@@ -1,4 +1,4 @@
-import { Shield, Users, Truck, ArrowRight, HeartPulse, Activity } from 'lucide-react';
+import { Shield, Users, ArrowRight, HeartPulse, Activity } from 'lucide-react';
 import { UserRole } from '../types';
 
 interface LandingPageProps {
@@ -36,7 +36,7 @@ export default function LandingPage({ onRoleSelect }: LandingPageProps) {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-12">
             {/* Civilian Card */}
             <div 
               onClick={() => onRoleSelect('civilian')}
@@ -77,28 +77,6 @@ export default function LandingPage({ onRoleSelect }: LandingPageProps) {
                 </p>
                 <div className="flex items-center text-emerald-600 font-semibold group-hover:translate-x-2 transition-transform">
                   Join Efforts <ArrowRight className="ml-2 w-4 h-4" />
-                </div>
-              </div>
-            </div>
-
-            {/* Rescue Team Card */}
-            <div 
-              onClick={() => onRoleSelect('rescue-team')}
-              className="group cursor-pointer relative bg-white rounded-3xl p-8 shadow-sm border border-slate-200 hover:border-red-500 hover:shadow-xl transition-all duration-300 overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                <Truck className="w-24 h-24 text-red-600" />
-              </div>
-              <div className="relative">
-                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-red-500 transition-colors">
-                  <Shield className="w-7 h-7 text-red-600 group-hover:text-white" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3">Rescue Team</h3>
-                <p className="text-slate-500 mb-6 leading-relaxed">
-                  Official responders coordinating large-scale rescue operations.
-                </p>
-                <div className="flex items-center text-red-600 font-semibold group-hover:translate-x-2 transition-transform">
-                  Access Portal <ArrowRight className="ml-2 w-4 h-4" />
                 </div>
               </div>
             </div>

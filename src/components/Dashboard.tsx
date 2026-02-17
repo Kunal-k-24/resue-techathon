@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, Plus, MapPin, Activity, Shield, ArrowRight, Info, HeartPulse } from 'lucide-react';
+import { AlertCircle, Plus, MapPin, Shield, ArrowRight, Info, HeartPulse } from 'lucide-react';
 import { UserRole } from '../types';
 import ReportIncidentForm from './ReportIncidentForm';
 import { supabase } from '../lib/supabase';
@@ -32,8 +32,8 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(sheltersSubscription);
-      supabase.removeChannel(tasksSubscription);
+      sheltersSubscription.unsubscribe();
+      tasksSubscription.unsubscribe();
     };
   }, []);
 
@@ -65,13 +65,15 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
 
   const confirmSOS = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       // Create an incident record for the SOS
       await supabase.from('incidents').insert({
         type: 'sos',
         description: 'Emergency SOS triggered from dashboard',
         location_name: 'User Current Location',
         urgency: 'critical',
-        status: 'pending'
+        status: 'pending',
+        reporter_id: user?.id
       });
 
       setSosTriggered(true);
@@ -97,12 +99,10 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
             <h1 className="text-3xl md:text-4xl font-black text-slate-900 leading-tight">
               {userRole === 'civilian' && 'Emergency Dashboard'}
               {userRole === 'volunteer' && 'Volunteer Hub'}
-              {userRole === 'rescue-team' && 'Command Center'}
             </h1>
             <p className="text-slate-500 mt-2 max-w-xl">
               {userRole === 'civilian' && 'Immediate assistance and incident reporting at your fingertips.'}
               {userRole === 'volunteer' && 'Contribute to active relief efforts and coordinate with your team.'}
-              {userRole === 'rescue-team' && 'Real-time oversight and resource management for official responders.'}
             </p>
           </div>
           <div className="hidden md:flex items-center gap-3">
@@ -139,7 +139,7 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
             className="group relative bg-red-600 rounded-[2.5rem] p-8 shadow-2xl shadow-red-200 overflow-hidden transition-all duration-300 hover:scale-[1.02] active:scale-95 text-left"
           >
             <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-              <Activity className="w-32 h-32 text-white" />
+              <Shield className="w-32 h-32 text-white" />
             </div>
             <div className="relative z-10">
               <div className="bg-white/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-8">
@@ -228,7 +228,7 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
           </div>
 
           {/* Tasks or Updates Section */}
-          {(userRole === 'volunteer' || userRole === 'rescue-team') ? (
+          {userRole === 'volunteer' ? (
             <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-200">
               <div className="flex items-center justify-between mb-8">
                 <div>
@@ -236,7 +236,7 @@ export default function Dashboard({ userRole, onNavigate }: DashboardProps) {
                   <p className="text-slate-400 text-sm font-medium">Needs immediate attention</p>
                 </div>
                 <div className="bg-red-50 p-3 rounded-2xl">
-                  <Activity className="w-5 h-5 text-red-500" />
+                  <Shield className="w-5 h-5 text-red-500" />
                 </div>
               </div>
               <div className="space-y-4">

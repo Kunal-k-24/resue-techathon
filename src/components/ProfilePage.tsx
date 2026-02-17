@@ -31,7 +31,7 @@ export default function ProfilePage({ userRole }: ProfilePageProps) {
         // No profile found, create a mock one
         const newProfile = {
           role: userRole,
-          full_name: userRole === 'volunteer' ? 'Sarah Johnson' : userRole === 'rescue-team' ? 'Captain Mike Roberts' : 'John Doe',
+          full_name: userRole === 'volunteer' ? 'Sarah Johnson' : 'John Doe',
           email: `${userRole}@example.com`,
           phone: '+1 (555) 000-0000',
           location: 'City Center',
@@ -84,8 +84,6 @@ export default function ProfilePage({ userRole }: ProfilePageProps) {
         return { color: 'bg-blue-100 text-blue-700', label: 'Civilian' };
       case 'volunteer':
         return { color: 'bg-emerald-100 text-emerald-700', label: 'Volunteer' };
-      case 'rescue-team':
-        return { color: 'bg-red-100 text-red-700', label: 'Rescue Team' };
       default:
         return { color: 'bg-slate-100 text-slate-700', label: 'User' };
     }
@@ -158,13 +156,13 @@ export default function ProfilePage({ userRole }: ProfilePageProps) {
                       { icon: Shield, label: 'ID Verified', value: 'Active', color: 'text-red-500' }
                     ].map((item, i) => (
                       <div key={i} className="group p-5 bg-slate-50 rounded-[2rem] border border-transparent hover:border-slate-200 hover:bg-white transition-all">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-3 bg-white rounded-2xl shadow-sm group-hover:scale-110 transition-transform ${item.color}`}>
+                        <div className="flex items-center gap-4 mb-4">
+                          <div className={`w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center ${item.color}`}>
                             <item.icon className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-0.5">{item.label}</p>
-                            <p className="text-sm font-bold text-slate-700 truncate max-w-[150px]">{item.value}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</p>
+                            <p className="font-bold text-slate-900 truncate">{item.value}</p>
                           </div>
                         </div>
                       </div>
