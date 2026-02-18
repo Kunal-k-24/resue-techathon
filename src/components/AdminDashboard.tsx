@@ -36,7 +36,22 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [assignmentLoading, setAssignmentLoading] = useState<string | null>(null);
   const [showIncidentDetail, setShowIncidentDetail] = useState<boolean>(false);
   const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [resources, setResources] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation([position.coords.latitude, position.coords.longitude]);
+        },
+        () => {
+          console.warn("Geolocation denied, defaulting to Mumbai");
+          setUserLocation([19.0760, 72.8777]);
+        }
+      );
+    }
+  }, []);
   const [resourceForm, setResourceForm] = useState({
     name: '',
     type: 'shelter' as 'shelter' | 'hospital' | 'storm' | 'flood' | 'earthquake',
@@ -465,40 +480,31 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       {/* Analytics Visualization Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-8">
-          {/* Advanced Heatmap */}
-          <div className="bg-slate-900 rounded-[3.5rem] p-2 border border-white/5 shadow-2xl overflow-hidden relative min-h-[600px] group">
+          {/* Advanced Map Overview */}
+          <div className="bg-white rounded-[3.5rem] p-4 border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.02)] overflow-hidden relative h-[600px] group">
             <div className="absolute top-8 left-8 z-10 flex flex-col gap-3">
-              <div className="bg-slate-900/80 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl border border-white/10 ring-1 ring-white/5">
+              <div className="bg-white/90 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl border border-slate-100 ring-1 ring-slate-100">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
-                  <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Live Threat Density</h3>
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">Live Situational Map</h3>
                 </div>
-                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest max-w-[180px] leading-relaxed">
-                  Analyzing field report clusters for resource optimization.
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest max-w-[180px] leading-relaxed">
+                  Real-time visualization of field reports and active resource nodes.
                 </p>
-              </div>
-              
-              <div className="flex gap-2">
-                <div className="bg-slate-900/80 backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/5 text-[10px] font-black text-white/60 uppercase tracking-widest flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-500" /> High
-                </div>
-                <div className="bg-slate-900/80 backdrop-blur-xl px-4 py-3 rounded-2xl border border-white/5 text-[10px] font-black text-white/60 uppercase tracking-widest flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500" /> Low
-                </div>
               </div>
             </div>
 
-            <div className="w-full h-full rounded-[3rem] overflow-hidden grayscale-[0.2] contrast-[1.1]">
+            <div className="w-full h-full rounded-[3rem] overflow-hidden">
               <ResourceMap 
                 resources={resources} 
                 incidents={incidents}
-                isHeatmap={true}
+                isHeatmap={false}
               />
             </div>
             
             <div className="absolute bottom-8 right-8 z-10 flex gap-3">
-              <button className="px-8 py-4 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-white/10 transition-all">Satellite Mode</button>
-              <button className="px-8 py-4 bg-red-600 rounded-2xl shadow-xl shadow-red-900/20 text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-red-500 transition-all hover:scale-105 active:scale-95">Real-time Heatmap</button>
+              <button className="px-8 py-4 bg-slate-900 rounded-2xl shadow-xl text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-black transition-all">Satellite Mode</button>
+              <button className="px-8 py-4 bg-red-600 rounded-2xl shadow-xl shadow-red-100 text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-red-500 transition-all hover:scale-105 active:scale-95">Live Updates</button>
             </div>
           </div>
 
@@ -591,8 +597,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           </div>
 
           {/* High-Resolution Live Pulse */}
-          <div className="bg-slate-900 rounded-[3.5rem] p-10 shadow-2xl border border-white/5 flex flex-col flex-1 min-h-[500px]">
-            <div className="flex items-center justify-between mb-10">
+          <div className="bg-slate-900 rounded-[3.5rem] p-10 shadow-2xl border border-white/5 flex flex-col h-[650px]">
+            <div className="flex items-center justify-between mb-8">
               <div>
                 <h3 className="text-2xl font-black text-white tracking-tight italic flex items-center gap-3">
                   <Activity className="w-6 h-6 text-red-500 animate-pulse" /> Live Pulse
@@ -604,39 +610,39 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               </div>
             </div>
             
-            <div className="flex-1 space-y-4 overflow-y-auto pr-4 custom-scrollbar-dark">
+            <div className="flex-1 space-y-4 overflow-y-auto pr-2 custom-scrollbar-dark min-h-0">
               {incidents.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-white/10">
+                <div className="flex flex-col items-center justify-center h-full text-white/10 py-10">
                   <ShieldAlert className="w-16 h-16 mb-4" />
                   <p className="font-black text-xs uppercase tracking-[0.3em]">Scanning airspace...</p>
                 </div>
               ) : (
-                incidents.slice(0, 10).map((incident) => (
+                incidents.slice(0, 8).map((incident) => (
                   <div 
                     key={incident.id} 
-                    className="p-5 bg-white/5 rounded-[2rem] border border-white/5 group hover:bg-white/10 hover:border-red-500/30 transition-all cursor-pointer relative overflow-hidden"
+                    className="p-4 bg-white/5 rounded-[1.5rem] border border-white/5 group hover:bg-white/10 hover:border-red-500/30 transition-all cursor-pointer relative overflow-hidden"
                     onClick={() => {
                       setSelectedIncident(incident);
                       setShowIncidentDetail(true);
                     }}
                   >
                     <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:bg-red-500/10 transition-colors" />
-                    <div className="flex items-start gap-5 relative z-10">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ${
+                    <div className="flex items-start gap-4 relative z-10">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-lg ${
                         incident.urgency === 'critical' ? 'bg-red-500 text-white' : 'bg-orange-500/20 text-orange-500'
                       }`}>
-                        <span className="text-xl">{incident.type === 'fire' ? '🔥' : incident.type === 'flood' ? '🌊' : incident.type === 'earthquake' ? '🏘️' : incident.type === 'medical' ? '🚑' : incident.type === 'sos' ? '🆘' : '❓'}</span>
+                        <span className="text-lg">{incident.type === 'fire' ? '🔥' : incident.type === 'flood' ? '🌊' : incident.type === 'earthquake' ? '🏘️' : incident.type === 'medical' ? '🚑' : incident.type === 'sos' ? '🆘' : '❓'}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <p className="font-black text-white text-xs uppercase tracking-tight">{incident.type}</p>
-                          <span className="text-[9px] font-black text-white/30 uppercase italic">
+                          <p className="font-black text-white text-[10px] uppercase tracking-tight truncate">{incident.type}</p>
+                          <span className="text-[8px] font-black text-white/30 uppercase italic">
                             {new Date(incident.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <MapPin className="w-3 h-3 text-red-500" />
-                          <span className="text-[9px] font-black text-white/40 uppercase tracking-widest truncate">{incident.location_name}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <MapPin className="w-2.5 h-2.5 text-red-500" />
+                          <span className="text-[8px] font-black text-white/40 uppercase tracking-widest truncate">{incident.location_name}</span>
                         </div>
                       </div>
                     </div>
@@ -647,7 +653,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             
             <button 
               onClick={() => setActiveTab('manage-incidents')}
-              className="mt-10 w-full py-5 bg-white text-slate-900 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-3 hover:bg-slate-100 transition-all active:scale-[0.98] shadow-2xl"
+              className="mt-8 w-full py-4 bg-white text-slate-900 rounded-[1.5rem] font-black text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-3 hover:bg-slate-100 transition-all active:scale-[0.98] shadow-2xl shrink-0"
             >
               Master Operations <ArrowRight className="w-4 h-4" />
             </button>
@@ -916,9 +922,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
             <div className="space-y-2">
               <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Select Location (Drag Marker)</label>
-              <ResourceMap 
-                onLocationSelect={(lat, lng) => setResourceForm({...resourceForm, location_lat: lat, location_lng: lng})} 
-              />
+              <div className="h-64 rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+                <ResourceMap 
+                  onLocationSelect={(lat, lng) => setResourceForm({...resourceForm, location_lat: lat, location_lng: lng})} 
+                  initialLocation={[resourceForm.location_lat, resourceForm.location_lng]}
+                />
+              </div>
             </div>
 
             <button
@@ -1288,17 +1297,18 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Log for debugging
-      console.log('Triggering disaster with form:', triggerForm);
+      // Use selected coordinates if available, otherwise use detected user location
+      const lat = (triggerForm as any).location_lat || (userLocation?.[0] || 19.0760);
+      const lng = (triggerForm as any).location_lng || (userLocation?.[1] || 72.8777);
 
       const { error } = await supabase
         .from('incidents')
         .insert([{
           type: triggerForm.type,
           description: triggerForm.description,
-          location_name: triggerForm.location,
-          location_lat: 19.0760,
-          location_lng: 72.8777,
+          location_name: `Sector-${Math.floor(Math.random() * 1000)}`, // Auto-generate name since manual field is removed
+          location_lat: lat,
+          location_lng: lng,
           status: 'pending',
           urgency: triggerForm.severity,
           reporter_id: user?.id
@@ -1335,7 +1345,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       </div>
 
       <form onSubmit={handleTriggerDisaster} className="space-y-6">
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Event Type</label>
             <select
@@ -1368,31 +1378,25 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         </div>
 
         <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Location</label>
-          <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-            <input
-              type="text"
-              required
-              value={triggerForm.location}
-              onChange={(e) => setTriggerForm({...triggerForm, location: e.target.value})}
-              className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-500 transition-all placeholder:text-slate-300"
-              placeholder="Area or Coordinates"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Description / Guidance</label>
           <div className="relative">
             <Info className="absolute left-4 top-4 w-5 h-5 text-slate-300" />
             <textarea
               required
-              rows={4}
+              rows={3}
               value={triggerForm.description}
               onChange={(e) => setTriggerForm({...triggerForm, description: e.target.value})}
               className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold outline-none focus:ring-4 focus:ring-red-500/10 focus:border-red-500 transition-all placeholder:text-slate-300 resize-none"
               placeholder="Provide details and safety instructions..."
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Incident Location (Select on Map)</label>
+          <div className="h-64 rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+            <ResourceMap 
+              onLocationSelect={(lat, lng) => setTriggerForm({...triggerForm, location_lat: lat, location_lng: lng} as any)} 
             />
           </div>
         </div>
