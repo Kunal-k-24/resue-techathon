@@ -5,9 +5,10 @@ import {
   BookOpen, GraduationCap,
   Search, Filter, Home, Cross, Image as ImageIcon, Wind, Droplets, Thermometer, 
   TrendingUp, ShieldAlert, BarChart3, Activity, Menu, LogOut, PieChart as PieChartIcon,
-  MessageSquare
+  MessageSquare, Plane
 } from 'lucide-react';
 import RescueChannel from './RescueChannel';
+import DroneAnalysis from './DroneAnalysis';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
@@ -29,7 +30,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [editingUserId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('civilian');
   const [weather, setWeather] = useState({ temp: 28, humidity: 65, windSpeed: 12, city: 'Mumbai' });
-  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'users' | 'tasks' | 'trigger' | 'resources' | 'manage-incidents' | 'training' | 'rescue-channel'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'users' | 'tasks' | 'trigger' | 'resources' | 'manage-incidents' | 'training' | 'rescue-channel' | 'drone-analysis'>('overview');
   const [activeRescueId, setActiveRescueId] = useState<string | null>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
 
@@ -1940,6 +1941,7 @@ Final assessment and certification steps.
   const tabs = [
     { id: 'overview', label: 'Command Overview', icon: LayoutDashboard },
     { id: 'rescue-channel', label: 'Rescue Channel', icon: MessageSquare },
+    { id: 'drone-analysis', label: 'Drone Analysis', icon: Plane },
     { id: 'training', label: 'Academy', icon: GraduationCap },
     { id: 'manage-incidents', label: 'Field Operations', icon: AlertCircle },
     { id: 'tasks', label: 'Mission Log', icon: ClipboardList },
@@ -2290,6 +2292,9 @@ Final assessment and certification steps.
                   onSelectIncident={(id: string) => setActiveRescueId(id)}
                 />
               </div>
+            )}
+            {activeTab === 'drone-analysis' && (
+              <DroneAnalysis />
             )}
           </div>
           {renderShortcuts()}

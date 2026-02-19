@@ -13,6 +13,8 @@
   "dependencies": {
     "@react-google-maps/api": "^2.20.8",
     "@supabase/supabase-js": "^2.95.3",
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
     "@types/leaflet.heat": "^0.2.5",
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
