@@ -4,8 +4,10 @@ import {
   Clock, ArrowRight, Zap, MapPin, Info, Bell, LayoutDashboard, ClipboardList, 
   BookOpen, GraduationCap,
   Search, Filter, Home, Cross, Image as ImageIcon, Wind, Droplets, Thermometer, 
-  TrendingUp, ShieldAlert, BarChart3, Activity, Menu, LogOut, PieChart as PieChartIcon
+  TrendingUp, ShieldAlert, BarChart3, Activity, Menu, LogOut, PieChart as PieChartIcon,
+  MessageSquare
 } from 'lucide-react';
+import RescueChannel from './RescueChannel';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell 
@@ -27,7 +29,21 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [editingUserId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('civilian');
   const [weather, setWeather] = useState({ temp: 28, humidity: 65, windSpeed: 12, city: 'Mumbai' });
-  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'users' | 'tasks' | 'trigger' | 'resources' | 'manage-incidents' | 'training'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'users' | 'tasks' | 'trigger' | 'resources' | 'manage-incidents' | 'training' | 'rescue-channel'>('overview');
+  const [activeRescueId, setActiveRescueId] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    fetchCurrentUser();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      setCurrentUserProfile(data);
+    }
+  };
   const [incidents, setIncidents] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -779,9 +795,28 @@ Final assessment and certification steps.
                   </h2>
                 </div>
               </div>
-              <p className="text-slate-500 font-medium max-w-lg text-lg leading-relaxed">
+            <p className="text-slate-500 font-medium max-w-lg text-lg leading-relaxed">
                 Aggregating real-time field data and environmental patterns for comprehensive metropolitan safety management.
               </p>
+              
+              <div className="mt-8">
+                <button
+                  onClick={handleBigDisasterTrigger}
+                  disabled={loading}
+                  className="group relative flex items-center gap-4 px-10 py-6 bg-slate-900 rounded-[2.5rem] border-4 border-red-600 shadow-2xl hover:bg-black transition-all active:scale-95 disabled:opacity-50 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-red-600/10 group-hover:bg-red-600/20 transition-colors animate-pulse" />
+                  <div className="relative z-10 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-500/50 group-hover:scale-110 transition-transform">
+                      <ShieldAlert className="w-6 h-6 text-white animate-bounce" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500 mb-1">Emergency Protocol</p>
+                      <p className="text-xl font-black text-white italic tracking-tighter">DECLARE BIG DISASTER</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
             
             <div className="flex flex-wrap gap-4">
@@ -879,8 +914,8 @@ Final assessment and certification steps.
                 </div>
               </div>
             </div>
-            <div className="h-[350px] w-full min-h-[350px] relative">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={350}>
+            <div className="h-[350px] w-full relative">
+              <ResponsiveContainer width="99%" height={350}>
                 <BarChart data={activityData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
                   <XAxis 
@@ -906,12 +941,12 @@ Final assessment and certification steps.
             <h3 className="text-2xl font-black text-slate-900 tracking-tight italic flex items-center gap-3 mb-10">
               <PieChartIcon className="w-6 h-6 text-purple-600" /> Threat Vectors
             </h3>
-            <div className="h-[280px] w-full min-h-[280px] relative">
+            <div className="h-[280px] w-full relative">
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
                 <span className="text-4xl font-black text-slate-900 tracking-tighter">{activeIncidents}</span>
                 <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Active Total</span>
               </div>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={280}>
+              <ResponsiveContainer width="99%" height={280}>
                 <PieChart>
                   <Pie
                     data={incidentChartData}
@@ -1651,9 +1686,19 @@ Final assessment and certification steps.
               </div>
             </div>
 
-            <div className="flex gap-3 pt-8 border-t border-slate-100">
-              <button 
-                onClick={() => handleUpdateIncidentStatus(selectedIncident.id, 'responding')}
+                <div className="flex gap-3 pt-8 border-t border-slate-100">
+                  <button 
+                    onClick={() => {
+                      setActiveRescueId(selectedIncident.id);
+                      setActiveTab('rescue-channel');
+                      setShowIncidentDetail(false);
+                    }}
+                    className="flex-1 bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Open Channel
+                  </button>
+                  <button 
+                    onClick={() => handleUpdateIncidentStatus(selectedIncident.id, 'responding')}
                 className="flex-1 bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
               >
                 Launch Response
@@ -1714,6 +1759,74 @@ Final assessment and certification steps.
     } catch (error) {
       console.error('Error triggering disaster:', error);
       alert('Failed to trigger disaster.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBigDisasterTrigger = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const lat = triggerForm.location_lat || (userLocation?.[0] || 19.0760);
+      const lng = triggerForm.location_lng || (userLocation?.[1] || 72.8777);
+
+      // 1. Create the Big Disaster Incident
+      const { data: incident, error: incError } = await supabase
+        .from('incidents')
+        .insert([{
+          type: triggerForm.type,
+          description: `🚨 BIG DISASTER ALERT: ${triggerForm.description}`,
+          location_name: `MAJOR SECTOR: ${triggerForm.location_name || 'Emergency Zone'}`,
+          location_lat: lat,
+          location_lng: lng,
+          status: 'responding',
+          urgency: 'critical',
+          reporter_id: user?.id
+        }])
+        .select()
+        .single();
+
+      if (incError) throw incError;
+
+      // 2. Automatically assign ALL active volunteers
+      const activeVolunteers = volunteers.filter(v => v.status === 'active');
+      
+      if (activeVolunteers.length > 0) {
+        const taskAssignments = activeVolunteers.map(v => ({
+          title: `URGENT: BIG DISASTER RESPONSE`,
+          description: `Immediate deployment required for ${triggerForm.type} at ${triggerForm.location_name}. Join the rescue channel immediately.`,
+          location: triggerForm.location_name || 'Emergency Zone',
+          priority: 'urgent',
+          status: 'in-progress',
+          assigned_to: v.id,
+          incident_id: incident.id
+        }));
+
+        const { error: taskError } = await supabase.from('tasks').insert(taskAssignments);
+        if (taskError) throw taskError;
+        
+        // Update the incident to show it's being handled by the team
+        await supabase.from('incidents').update({ assigned_volunteer_id: activeVolunteers[0].id }).eq('id', incident.id);
+      }
+
+      // 3. Send Initial System Message to the Rescue Channel
+      await supabase.from('rescue_messages').insert([{
+        incident_id: incident.id,
+        sender_id: user?.id,
+        sender_name: 'SYSTEM COMMAND',
+        content: `🚨 MAJOR DISASTER INITIATED: All volunteers have been automatically assigned. Please share your status and location immediately.`,
+        type: 'update'
+      }]);
+
+      alert('🚨 BIG DISASTER INITIATED! All volunteers assigned and Rescue Channel created.');
+      setActiveRescueId(incident.id);
+      setActiveTab('rescue-channel');
+    } catch (error) {
+      console.error('Error triggering Big Disaster:', error);
+      alert('Failed to trigger Big Disaster.');
     } finally {
       setLoading(false);
     }
@@ -1826,6 +1939,7 @@ Final assessment and certification steps.
 
   const tabs = [
     { id: 'overview', label: 'Command Overview', icon: LayoutDashboard },
+    { id: 'rescue-channel', label: 'Rescue Channel', icon: MessageSquare },
     { id: 'training', label: 'Academy', icon: GraduationCap },
     { id: 'manage-incidents', label: 'Field Operations', icon: AlertCircle },
     { id: 'tasks', label: 'Mission Log', icon: ClipboardList },
@@ -2168,6 +2282,15 @@ Final assessment and certification steps.
               </div>
             )}
             {activeTab === 'trigger' && renderTriggerDisaster()}
+            {activeTab === 'rescue-channel' && (
+              <div className="h-[calc(100vh-180px)]">
+                <RescueChannel 
+                  incidentId={activeRescueId || ''} 
+                  currentUser={currentUserProfile}
+                  onSelectIncident={(id: string) => setActiveRescueId(id)}
+                />
+              </div>
+            )}
           </div>
           {renderShortcuts()}
         </div>
