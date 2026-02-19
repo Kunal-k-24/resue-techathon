@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   User, CheckCircle, XCircle, Loader2, Users, AlertCircle, Trash2, Edit, Save, X, 
   Clock, ArrowRight, Zap, MapPin, Info, Bell, LayoutDashboard, ClipboardList, 
+  BookOpen, GraduationCap,
   Search, Filter, Home, Cross, Image as ImageIcon, Wind, Droplets, Thermometer, 
   TrendingUp, ShieldAlert, BarChart3, Activity, Menu, LogOut, PieChart as PieChartIcon
 } from 'lucide-react';
@@ -26,7 +27,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [editingUserId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<UserRole>('civilian');
   const [weather, setWeather] = useState({ temp: 28, humidity: 65, windSpeed: 12, city: 'Mumbai' });
-  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'users' | 'tasks' | 'trigger' | 'resources' | 'manage-incidents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'applications' | 'users' | 'tasks' | 'trigger' | 'resources' | 'manage-incidents' | 'training'>('overview');
   const [incidents, setIncidents] = useState<any[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -35,19 +36,39 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
   const [assignmentLoading, setAssignmentLoading] = useState<string | null>(null);
   const [showIncidentDetail, setShowIncidentDetail] = useState<boolean>(false);
-  const [showMobileMenu, setShowMobileMenu] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [resources, setResources] = useState<any[]>([]);
+  const [trainingModules, setTrainingModules] = useState<any[]>([]);
+  const [selectedVolunteers, setSelectedVolunteers] = useState<string[]>([]);
+  const [moduleForm, setModuleForm] = useState({
+    title: '',
+    description: '',
+    category: 'First Aid',
+    duration_minutes: 30,
+    content: ''
+  });
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation([position.coords.latitude, position.coords.longitude]);
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          setUserLocation([latitude, longitude]);
+          
+          // Reverse Geocoding to get City Name
+          try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`);
+            const data = await response.json();
+            const cityName = data.address.city || data.address.town || data.address.village || data.address.suburb || 'Local';
+            setWeather(prev => ({ ...prev, city: cityName }));
+          } catch (err) {
+            console.error('Error fetching city name:', err);
+          }
         },
         () => {
           console.warn("Geolocation denied, defaulting to Mumbai");
           setUserLocation([19.0760, 72.8777]);
+          setWeather(prev => ({ ...prev, city: 'Mumbai' }));
         }
       );
     }
@@ -64,9 +85,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   const [triggerForm, setTriggerForm] = useState({
     type: 'flood' as any,
-    location: '',
+    location_name: '', // Renamed from location to avoid confusion
     description: '',
-    severity: 'high' as 'low' | 'medium' | 'high' | 'critical'
+    severity: 'high' as 'low' | 'medium' | 'high' | 'critical',
+    location_lat: 19.0760,
+    location_lng: 72.8777
   });
 
   const [taskForm, setTaskForm] = useState({
@@ -179,10 +202,338 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       fetchIncidents(), 
       fetchTasks(),
       fetchVolunteers(),
-      fetchResources()
+      fetchResources(),
+      fetchTrainingModules()
     ]);
     setLoading(false);
   };
+
+  const fetchTrainingModules = async () => {
+    const { data } = await supabase.from('training_modules').select('*').order('created_at', { ascending: false });
+    setTrainingModules(data || []);
+  };
+
+  const handleCreateModule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('training_modules')
+        .insert([{
+          ...moduleForm,
+          created_by: user?.id
+        }]);
+
+      if (error) throw error;
+
+      alert('Training Module Created Successfully!');
+      setModuleForm({
+        title: '',
+        description: '',
+        category: 'First Aid',
+        duration_minutes: 30,
+        content: ''
+      });
+      fetchTrainingModules();
+    } catch (error) {
+      console.error('Error creating module:', error);
+      alert('Failed to create module.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteModule = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this module?')) return;
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('training_modules').delete().eq('id', id);
+      if (error) throw error;
+      fetchTrainingModules();
+    } catch (error) {
+      console.error('Error deleting module:', error);
+      alert('Failed to delete module.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssignModule = async (moduleId: string, target: 'all' | 'selected') => {
+    setLoading(true);
+    try {
+      const targetVolunteerIds = target === 'all' 
+        ? volunteers.map(v => v.id)
+        : selectedVolunteers;
+
+      if (targetVolunteerIds.length === 0) {
+        alert('No volunteers selected.');
+        return;
+      }
+
+      const assignments = targetVolunteerIds.map(vId => ({
+        module_id: moduleId,
+        volunteer_id: vId,
+        status: 'pending'
+      }));
+
+      const { error } = await supabase.from('module_assignments').upsert(assignments, {
+        onConflict: 'module_id,volunteer_id'
+      });
+
+      if (error) throw error;
+      alert(`Module assigned to ${targetVolunteerIds.length} volunteer(s).`);
+      setSelectedVolunteers([]);
+    } catch (error) {
+      console.error('Error assigning module:', error);
+      alert('Failed to assign module.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const [isAiGenerating, setIsAiGenerating] = useState(false);
+
+  const handleAiGenerateModule = async () => {
+    if (!moduleForm.title || !moduleForm.description) {
+      alert('Please provide a title and brief description for the AI to expand upon.');
+      return;
+    }
+    
+    setIsAiGenerating(true);
+    try {
+      // In a real app, this would call an Edge Function or OpenAI directly
+      // Simulating AI generation for the hackathon
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const generatedContent = `
+# ${moduleForm.title}
+## Overview
+${moduleForm.description}
+
+## Chapter 1: Core Fundamentals
+In this section, we explore the primary responsibilities and safety protocols.
+
+### 1.1 Risk Assessment
+Always evaluate the environment before proceeding with rescue operations.
+*   Identify hazards
+*   Secure the perimeter
+*   Establish communication lines
+
+## Chapter 2: Operational Procedures
+Step-by-step guidance on executing the mission objectives effectively.
+
+## Chapter 3: Emergency Response
+What to do when conditions deteriorate rapidly.
+
+## Conclusion
+Final assessment and certification steps.
+      `.trim();
+      
+      setModuleForm(prev => ({
+        ...prev,
+        content: generatedContent,
+        duration_minutes: 45
+      }));
+      
+      alert('AI has successfully drafted your training module!');
+    } catch (error) {
+      console.error('AI Generation Error:', error);
+      alert('AI generation failed.');
+    } finally {
+      setIsAiGenerating(false);
+    }
+  };
+
+  const renderTraining = () => (
+    <div className="animate-in fade-in duration-500">
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Microsoft Learn Style Sidebar / Creator */}
+        <div className="w-full lg:w-[400px] shrink-0">
+          <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm sticky top-32">
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 bg-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-100">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none">Module Creator</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-1">Academy Architect</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateModule} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Category</label>
+                  <select
+                    value={moduleForm.category}
+                    onChange={e => setModuleForm({...moduleForm, category: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500"
+                  >
+                    <option value="First Aid">First Aid</option>
+                    <option value="Fire Safety">Fire Safety</option>
+                    <option value="Search & Rescue">Search & Rescue</option>
+                    <option value="Emergency Comm">Emergency Comm</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Module Title</label>
+                  <input
+                    required
+                    type="text"
+                    value={moduleForm.title}
+                    onChange={e => setModuleForm({...moduleForm, title: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500"
+                    placeholder="e.g., Urban Flood Rescue"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Brief Context</label>
+                  <textarea
+                    required
+                    rows={2}
+                    value={moduleForm.description}
+                    onChange={e => setModuleForm({...moduleForm, description: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 resize-none"
+                    placeholder="Short summary for the card..."
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAiGenerateModule}
+                  disabled={isAiGenerating || !moduleForm.title}
+                  className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-black transition-all group overflow-hidden relative shadow-xl active:scale-95 disabled:opacity-50"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-blue-600/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+                  {isAiGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-yellow-400" />}
+                  Generate Content with AI
+                </button>
+
+                <div className="space-y-1 pt-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Curriculum Content (Draft)</label>
+                  <textarea
+                    required
+                    rows={6}
+                    value={moduleForm.content}
+                    onChange={e => setModuleForm({...moduleForm, content: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xs outline-none focus:ring-4 focus:ring-purple-500/10 focus:border-purple-500 resize-none custom-scrollbar"
+                    placeholder="Markdown supported chapters..."
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !moduleForm.content}
+                className="w-full bg-purple-600 text-white py-5 rounded-2xl font-black shadow-xl shadow-purple-100 hover:bg-purple-700 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:bg-slate-200"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                Publish Academy Module
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {/* Learn Style Module Grid */}
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-8 px-4">
+            <div>
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight">Curriculum <span className="text-purple-600 italic">Repository</span></h2>
+              <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">Standardized Volunteer Training Paths</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="p-3 bg-white rounded-xl border border-slate-100 text-slate-400 hover:text-purple-600 transition-all shadow-sm"><Filter className="w-5 h-5" /></button>
+              <button className="p-3 bg-white rounded-xl border border-slate-100 text-slate-400 hover:text-purple-600 transition-all shadow-sm"><Search className="w-5 h-5" /></button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {trainingModules.map((mod) => (
+              <div key={mod.id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 group overflow-hidden flex flex-col h-full">
+                <div className="h-4 bg-purple-600 w-full" />
+                <div className="p-8 flex-1 flex flex-col">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="w-14 h-14 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                      <BookOpen className="w-7 h-7" />
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleDeleteModule(mod.id)}
+                        className="p-2.5 text-slate-200 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-purple-100">
+                        {mod.category}
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                        <Clock className="w-3 h-3" /> {mod.duration_minutes}m
+                      </span>
+                    </div>
+                    <h4 className="text-xl font-black text-slate-900 tracking-tight mb-3 group-hover:text-purple-600 transition-colors">{mod.title}</h4>
+                    <p className="text-slate-500 text-sm font-medium leading-relaxed italic mb-6 line-clamp-2">
+                      "{mod.description}"
+                    </p>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-50 mt-auto flex items-center justify-between gap-4">
+                    <button 
+                      onClick={() => handleAssignModule(mod.id, 'all')}
+                      className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-all active:scale-95"
+                    >
+                      Mass Assign
+                    </button>
+                    <div className="relative group/dispatch">
+                      <button className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 hover:bg-white hover:text-purple-600 transition-all">
+                        <Filter className="w-4 h-4" />
+                      </button>
+                      <div className="absolute right-0 bottom-full mb-4 w-72 bg-white rounded-[2rem] shadow-2xl border border-slate-100 p-6 hidden group-hover/dispatch:block z-50 animate-in fade-in slide-in-from-bottom-2">
+                        <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-4">Precision Targeting</h5>
+                        <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2 mb-6">
+                          {volunteers.map(v => (
+                            <label key={v.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-all border border-transparent hover:border-slate-100">
+                              <input 
+                                type="checkbox"
+                                checked={selectedVolunteers.includes(v.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedVolunteers([...selectedVolunteers, v.id]);
+                                  else setSelectedVolunteers(selectedVolunteers.filter(id => id !== v.id));
+                                }}
+                                className="w-5 h-5 rounded-lg border-slate-300 text-purple-600 focus:ring-purple-500/20"
+                              />
+                              <div className="flex flex-col">
+                                <span className="text-xs font-black text-slate-900 leading-none mb-1">{v.full_name}</span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{v.status}</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        <button 
+                          onClick={() => handleAssignModule(mod.id, 'selected')}
+                          disabled={selectedVolunteers.length === 0 || loading}
+                          className="w-full py-4 bg-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 disabled:bg-slate-200 disabled:shadow-none transition-all active:scale-95"
+                        >
+                          Dispatch ({selectedVolunteers.length})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const fetchResources = async () => {
     const { data } = await supabase.from('shelters').select('*').order('created_at', { ascending: false });
@@ -195,11 +546,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   };
 
   const fetchIncidents = async () => {
-    const { data } = await supabase
+    const { data: incidentsData } = await supabase
       .from('incidents')
       .select('*, tasks(status), profiles:assigned_volunteer_id(full_name)')
       .order('created_at', { ascending: false });
-    setIncidents(data || []);
+    setIncidents(incidentsData || []);
   };
 
   const fetchTasks = async () => {
@@ -528,7 +879,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 </div>
               </div>
             </div>
-            <div className="h-[350px] w-full min-h-[350px]">
+            <div className="h-[350px] w-full min-h-[350px] relative">
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={350}>
                 <BarChart data={activityData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
@@ -556,7 +907,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               <PieChartIcon className="w-6 h-6 text-purple-600" /> Threat Vectors
             </h3>
             <div className="h-[280px] w-full min-h-[280px] relative">
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
                 <span className="text-4xl font-black text-slate-900 tracking-tighter">{activeIncidents}</span>
                 <span className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Active Total</span>
               </div>
@@ -754,7 +1105,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                     <span className={`text-[10px] font-black uppercase tracking-widest ${
                       task.priority === 'urgent' ? 'text-red-500' : 'text-slate-400'
                     }`}>{task.priority}</span>
-                    <button className="p-2 text-slate-300 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    <button 
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="p-2 text-slate-300 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -764,6 +1120,36 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       </div>
     </div>
   );
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this mission log? This will also unlink it from any associated incidents.')) return;
+    setLoading(true);
+    try {
+      // 1. Unlink the task from incidents first to avoid foreign key violation (409 Conflict)
+      const { error: unlinkError } = await supabase
+        .from('incidents')
+        .update({ task_id: null })
+        .eq('task_id', taskId);
+
+      if (unlinkError) throw unlinkError;
+
+      // 2. Now delete the task
+      const { error: deleteError } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+
+      if (deleteError) throw deleteError;
+      
+      setTasks(prev => prev.filter(task => task.id !== taskId));
+      alert('Mission log deleted successfully');
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      alert('Failed to delete mission log. This may be due to active incident links.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCreateResource = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1297,16 +1683,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Use selected coordinates if available, otherwise use detected user location
-      const lat = (triggerForm as any).location_lat || (userLocation?.[0] || 19.0760);
-      const lng = (triggerForm as any).location_lng || (userLocation?.[1] || 72.8777);
+      const lat = triggerForm.location_lat || (userLocation?.[0] || 19.0760);
+      const lng = triggerForm.location_lng || (userLocation?.[1] || 72.8777);
 
       const { error } = await supabase
         .from('incidents')
         .insert([{
           type: triggerForm.type,
           description: triggerForm.description,
-          location_name: `Sector-${Math.floor(Math.random() * 1000)}`, // Auto-generate name since manual field is removed
+          location_name: `Sector-${Math.floor(Math.random() * 1000)}`,
           location_lat: lat,
           location_lng: lng,
           status: 'pending',
@@ -1319,9 +1704,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       alert('Disaster Event Triggered Successfully!');
       setTriggerForm({
         type: 'flood',
-        location: '',
+        location_name: '',
         description: '',
-        severity: 'high'
+        severity: 'high',
+        location_lat: userLocation?.[0] || 19.0760,
+        location_lng: userLocation?.[1] || 72.8777
       });
       setActiveTab('overview');
     } catch (error) {
@@ -1394,10 +1781,29 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
         <div className="space-y-2">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Incident Location (Select on Map)</label>
-          <div className="h-64 rounded-2xl overflow-hidden border border-slate-200 shadow-inner">
+          <div className="h-64 rounded-2xl overflow-hidden border border-slate-200 shadow-inner relative group/map">
             <ResourceMap 
-              onLocationSelect={(lat, lng) => setTriggerForm({...triggerForm, location_lat: lat, location_lng: lng} as any)} 
+              onLocationSelect={(lat, lng) => setTriggerForm(prev => ({...prev, location_lat: lat, location_lng: lng}))} 
+              initialLocation={[triggerForm.location_lat, triggerForm.location_lng]}
             />
+            <button
+              type="button"
+              onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition((pos) => {
+                    setTriggerForm(prev => ({
+                      ...prev,
+                      location_lat: pos.coords.latitude,
+                      location_lng: pos.coords.longitude
+                    }));
+                  });
+                }
+              }}
+              className="absolute bottom-4 right-4 z-[1000] bg-white/90 backdrop-blur-sm p-3 rounded-xl border border-slate-200 shadow-xl hover:bg-white transition-all active:scale-95 group-hover/map:translate-y-0 translate-y-2 opacity-0 group-hover/map:opacity-100 duration-300"
+              title="Reset to my location"
+            >
+              <MapPin className="w-4 h-4 text-red-600" />
+            </button>
           </div>
         </div>
 
@@ -1420,216 +1826,239 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   const tabs = [
     { id: 'overview', label: 'Command Overview', icon: LayoutDashboard },
-    { id: 'tasks', label: 'Mission Log', icon: ClipboardList },
+    { id: 'training', label: 'Academy', icon: GraduationCap },
     { id: 'manage-incidents', label: 'Field Operations', icon: AlertCircle },
+    { id: 'tasks', label: 'Mission Log', icon: ClipboardList },
     { id: 'resources', label: 'Resources', icon: Home },
     { id: 'applications', label: 'Personnel Vetting', icon: Users },
     { id: 'users', label: 'Network Registry', icon: User },
     { id: 'trigger', label: 'Trigger Alert', icon: Zap },
   ];
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Premium Admin Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] bg-white/80 backdrop-blur-xl border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            {/* Logo Section */}
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('overview')}>
-              <div className="w-10 h-10 bg-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-200">
-                <ShieldAlert className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tighter italic leading-none">Rescue <span className="text-red-600">Sync</span></h1>
+    <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
+      {/* Side Navigation Sidebar */}
+      <aside 
+        className={`fixed top-0 left-0 bottom-0 z-[110] bg-white border-r border-slate-100 transition-all duration-500 ease-in-out shadow-2xl flex flex-col ${
+          isSidebarOpen ? 'w-80' : 'w-24'
+        }`}
+      >
+        <div className="flex flex-col h-full overflow-hidden">
+          {/* Sidebar Logo */}
+          <div 
+            className="flex items-center gap-4 p-8 mb-4 cursor-pointer hover:opacity-80 transition-opacity" 
+            onClick={() => setActiveTab('overview')}
+          >
+            <div className="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-red-200">
+              <ShieldAlert className="w-7 h-7 text-white" />
+            </div>
+            {isSidebarOpen && (
+              <div className="animate-in fade-in slide-in-from-left-2 duration-500 overflow-hidden">
+                <h1 className="text-xl font-black text-slate-900 tracking-tighter italic leading-none whitespace-nowrap">Rescue <span className="text-red-600">Sync</span></h1>
                 <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Admin Command</p>
               </div>
-            </div>
-
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex items-center gap-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-slate-900 text-white shadow-xl shadow-slate-200 scale-105'
-                      : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-                  }`}
-                >
-                  <tab.icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                  {tab.id === 'applications' && applications.length > 0 && (
-                    <span className="ml-1 w-4 h-4 rounded-full bg-red-500 text-white text-[8px] flex items-center justify-center animate-pulse">
-                      {applications.length}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button 
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-400 hover:text-red-500 transition-colors relative"
-                >
-                  <Bell className="w-5 h-5" />
-                  {notifications.length > 0 && (
-                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 border-2 border-white rounded-full"></span>
-                  )}
-                </button>
-
-                {showNotifications && (
-                  <div className="absolute right-0 mt-4 w-80 bg-white rounded-[2rem] shadow-2xl border border-slate-100 z-50 overflow-hidden animate-scale-in">
-                    <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-                      <h4 className="font-black text-slate-900 tracking-tight">Intelligence Feed</h4>
-                      <button onClick={() => setNotifications([])} className="text-[10px] font-black text-red-600 uppercase tracking-widest">Clear All</button>
-                    </div>
-                    <div className="max-h-96 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-10 text-center">
-                          <Info className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">No New Alerts</p>
-                        </div>
-                      ) : (
-                        notifications.map(n => (
-                          <div key={n.id} className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                            <p className="font-black text-slate-900 text-sm">{n.title}</p>
-                            <p className="text-xs text-slate-500 font-medium mt-1">{n.message}</p>
-                            <p className="text-[10px] text-slate-300 font-bold mt-2 uppercase">{new Date(n.timestamp).toLocaleTimeString()}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Mobile Menu Button */}
-              <button 
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="lg:hidden p-3 bg-slate-900 text-white rounded-xl shadow-lg"
-              >
-                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-
-              <button 
-                onClick={() => supabase.auth.signOut()}
-                className="hidden lg:flex p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-400 hover:text-red-600 transition-colors"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
+            )}
           </div>
-        </div>
 
-        {/* Mobile Navigation Dropdown */}
-        {showMobileMenu && (
-          <div className="lg:hidden bg-white border-t border-slate-100 py-4 px-4 space-y-2 shadow-xl animate-in slide-in-from-top duration-300">
+          {/* Navigation Links */}
+          <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar overflow-x-hidden">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  setShowMobileMenu(false);
-                }}
-                className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all group relative ${
                   activeTab === tab.id
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-400 hover:bg-slate-50'
+                    ? 'bg-slate-900 text-white shadow-xl shadow-slate-200'
+                    : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
                 }`}
               >
-                <tab.icon className="w-5 h-5" />
-                {tab.label}
+                <tab.icon className={`w-5 h-5 shrink-0 transition-colors ${activeTab === tab.id ? 'text-red-500' : 'group-hover:text-slate-600'}`} />
+                {isSidebarOpen && (
+                  <span className="animate-in fade-in slide-in-from-left-2 duration-300 flex-1 text-left whitespace-nowrap">
+                    {tab.label}
+                  </span>
+                )}
                 {tab.id === 'applications' && applications.length > 0 && (
-                  <span className="ml-auto px-2 py-0.5 rounded-full bg-red-500 text-white text-[8px]">
+                  <span className={`flex items-center justify-center rounded-full bg-red-500 text-white text-[8px] animate-pulse border-2 border-white ${
+                    isSidebarOpen ? 'w-5 h-5 ml-auto' : 'absolute top-1 right-1 w-4 h-4'
+                  }`}>
                     {applications.length}
                   </span>
                 )}
+                {!isSidebarOpen && (
+                  <div className="absolute left-full ml-4 px-3 py-2 bg-slate-900 text-white text-[10px] rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-[120] shadow-xl">
+                    {tab.label}
+                  </div>
+                )}
               </button>
             ))}
+          </nav>
+
+          {/* Sidebar Footer */}
+          <div className="p-6 mt-auto border-t border-slate-50">
             <button 
               onClick={() => supabase.auth.signOut()}
-              className="w-full flex items-center gap-4 p-4 rounded-2xl font-black text-xs uppercase tracking-widest text-red-600 hover:bg-red-50 transition-all border-t border-slate-50 mt-4"
+              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black text-xs uppercase tracking-widest text-red-600 hover:bg-red-50 transition-all group ${
+                !isSidebarOpen ? 'justify-center' : ''
+              }`}
             >
-              <LogOut className="w-5 h-5" />
-              Sign Out Command
+              <LogOut className="w-5 h-5 shrink-0" />
+              {isSidebarOpen && <span className="whitespace-nowrap">Sign Out Command</span>}
             </button>
           </div>
-        )}
-      </nav>
+        </div>
+      </aside>
 
       {/* Main Content Area */}
-      <main className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'tasks' && renderTasks()}
-          {activeTab === 'manage-incidents' && renderManageIncidents()}
-          {activeTab === 'resources' && renderResources()}
-          {activeTab === 'applications' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {applications.length === 0 && !loading && (
-                <div className="md:col-span-2 py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200">
-                  <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Clock className="w-8 h-8 text-slate-300" />
+      <main 
+        className={`flex-1 min-h-screen transition-all duration-500 ease-in-out ${isSidebarOpen ? 'ml-80' : 'ml-24'}`}
+      >
+        {/* Top Fixed Header */}
+        <header 
+          className="fixed top-0 right-0 z-[100] h-24 bg-slate-50/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-10 transition-all duration-500"
+          style={{ left: isSidebarOpen ? '320px' : '96px' }}
+        >
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-3.5 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-md hover:shadow-lg active:scale-95"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <div className="hidden md:flex items-center gap-6 bg-white border border-slate-100 px-8 py-4 rounded-3xl shadow-md">
+               <div className="flex items-center gap-3">
+                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                 <span className="text-xs font-black uppercase tracking-widest text-slate-400">Secure</span>
+               </div>
+               <div className="w-px h-5 bg-slate-200" />
+               <span className="text-sm font-black uppercase tracking-widest text-slate-900">{weather.city} Command Console</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <div className="relative">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="p-4 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-red-500 transition-all shadow-md relative"
+              >
+                <Bell className="w-6 h-6" />
+                {notifications.length > 0 && (
+                  <span className="absolute top-3 right-3 w-3 h-3 bg-red-600 border-2 border-white rounded-full"></span>
+                )}
+              </button>
+
+              {showNotifications && (
+                <div className="absolute right-0 mt-6 w-96 bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 z-[120] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                  <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                    <div>
+                      <h4 className="font-black text-slate-900 tracking-tight text-base leading-none">Intelligence Feed</h4>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Real-time system alerts</p>
+                    </div>
+                    <button onClick={() => setNotifications([])} className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">Clear All</button>
                   </div>
-                  <p className="font-black text-slate-400 uppercase tracking-widest text-xs">No pending requests</p>
+                  <div className="max-h-96 overflow-y-auto custom-scrollbar">
+                    {notifications.length === 0 ? (
+                      <div className="p-16 text-center">
+                        <Info className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">No New Intelligence</p>
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className="p-6 border-b border-slate-50 hover:bg-slate-50 transition-colors group">
+                          <p className="font-black text-slate-900 text-sm">{n.title}</p>
+                          <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">{n.message}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               )}
-              {applications.map((app) => (
-                <div key={app.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
-                        <User className="w-7 h-7" />
+            </div>
+            
+            <div className="flex items-center gap-4 p-2 bg-white border border-slate-100 rounded-3xl shadow-md">
+              <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white">
+                <User className="w-6 h-6" />
+              </div>
+              <div className="pr-6 hidden sm:block">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none mb-1">Authenticated</p>
+                <p className="text-sm font-black text-slate-900 tracking-tight whitespace-nowrap">System Administrator</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Content Container */}
+        <div className="pt-36 pb-12 px-10 max-w-[1600px] mx-auto">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {activeTab === 'training' && renderTraining()}
+            {activeTab === 'overview' && renderOverview()}
+            {activeTab === 'tasks' && renderTasks()}
+            {activeTab === 'manage-incidents' && renderManageIncidents()}
+            {activeTab === 'resources' && renderResources()}
+            {activeTab === 'applications' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {applications.length === 0 && !loading && (
+                  <div className="md:col-span-2 py-20 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200">
+                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Clock className="w-8 h-8 text-slate-300" />
+                    </div>
+                    <p className="font-black text-slate-400 uppercase tracking-widest text-xs">No pending requests</p>
+                  </div>
+                )}
+                {applications.map((app) => (
+                  <div key={app.id} className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100 hover:shadow-xl transition-all group">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
+                          <User className="w-7 h-7" />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-slate-900 tracking-tight">{app.full_name}</h3>
+                          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">{app.contact_number}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprove(app)}
+                          disabled={!!processingId}
+                          className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-90"
+                        >
+                          {processingId === app.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                        </button>
+                        <button
+                          onClick={() => handleReject(app)}
+                          disabled={!!processingId}
+                          className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-90"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Qualifications</p>
+                        <div className="flex flex-wrap gap-2">
+                          {app.skills?.map((skill: string, i: number) => (
+                            <span key={i} className="px-3 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold border border-slate-100 italic">
+                              #{skill}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                       <div>
-                        <h3 className="text-xl font-black text-slate-900 tracking-tight">{app.full_name}</h3>
-                        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">{app.contact_number}</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Statement of Intent</p>
+                        <p className="text-slate-500 text-sm font-medium leading-relaxed italic line-clamp-3">"{app.reason}"</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove(app)}
-                        disabled={!!processingId}
-                        className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-90"
-                      >
-                        {processingId === app.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
-                      </button>
-                      <button
-                        onClick={() => handleReject(app)}
-                        disabled={!!processingId}
-                        className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-90"
-                      >
-                        <XCircle className="w-5 h-5" />
-                      </button>
-                    </div>
                   </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Qualifications</p>
-                      <div className="flex flex-wrap gap-2">
-                        {app.skills?.map((skill: string, i: number) => (
-                          <span key={i} className="px-3 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold border border-slate-100 italic">
-                            #{skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Statement of Intent</p>
-                      <p className="text-slate-500 text-sm font-medium leading-relaxed italic line-clamp-3">"{app.reason}"</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {activeTab === 'users' && (
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+                ))}
+              </div>
+            )}
+            {activeTab === 'users' && (
+              <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -1737,11 +2166,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   </table>
                 </div>
               </div>
-          )}
-          {activeTab === 'trigger' && renderTriggerDisaster()}
+            )}
+            {activeTab === 'trigger' && renderTriggerDisaster()}
+          </div>
+          {renderShortcuts()}
         </div>
-        
-        {renderShortcuts()}
       </main>
     </div>
   );

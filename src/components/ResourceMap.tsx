@@ -33,13 +33,19 @@ function LocationMarker({ onLocationSelect, initialLocation }: { onLocationSelec
 
   useEffect(() => {
     if (!initialLocation) {
-      map.locate().on("locationfound", (e: L.LocationEvent) => {
-        setPosition([e.latlng.lat, e.latlng.lng]);
+      map.locate({ setView: false }).on("locationfound", (e: L.LocationEvent) => {
+        const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
+        setPosition(newPos);
         map.flyTo(e.latlng, map.getZoom());
-        onLocationSelect(e.latlng.lat, e.latlng.lng);
+        if (onLocationSelect) {
+          onLocationSelect(e.latlng.lat, e.latlng.lng);
+        }
       });
+    } else {
+      setPosition(initialLocation);
+      map.flyTo(initialLocation, map.getZoom());
     }
-  }, [map, initialLocation, onLocationSelect]);
+  }, [map, initialLocation]);
   
   useMapEvents({
     click(e) {
@@ -69,6 +75,7 @@ function LocationMarker({ onLocationSelect, initialLocation }: { onLocationSelec
       eventHandlers={markerHandlers}
       position={position}
       icon={DefaultIcon}
+      zIndexOffset={1000}
     />
   );
 }
