@@ -1598,29 +1598,29 @@ Final assessment and certification steps.
 
       {/* Full Info Modal */}
       {showIncidentDetail && selectedIncident && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-in fade-in">
-          <div className="bg-white rounded-[3rem] p-10 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden relative">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-[200] animate-in fade-in">
+          <div className="bg-white rounded-[3rem] p-10 max-w-5xl w-full shadow-2xl animate-in zoom-in-95 duration-300 overflow-hidden relative max-h-[90vh] flex flex-col">
             <button 
               onClick={() => setShowIncidentDetail(false)}
-              className="absolute top-8 right-8 p-3 bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-all hover:rotate-90"
+              className="absolute top-8 right-8 p-3 bg-slate-100 rounded-2xl text-slate-400 hover:text-slate-600 transition-all hover:rotate-90 z-10"
             >
               <X className="w-6 h-6" />
             </button>
 
-            <div className="flex items-center gap-4 mb-8">
-              <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl ${
-                selectedIncident.urgency === 'critical' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'
+            <div className="flex items-center gap-6 mb-8 shrink-0">
+              <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center text-4xl shadow-lg ${
+                selectedIncident.urgency === 'critical' ? 'bg-red-50 text-red-600 shadow-red-100' : 'bg-orange-50 text-orange-600 shadow-orange-100'
               }`}>
                 {selectedIncident.type === 'fire' ? '🔥' : selectedIncident.type === 'flood' ? '🌊' : selectedIncident.type === 'earthquake' ? '🏘️' : selectedIncident.type === 'medical' ? '🚑' : selectedIncident.type === 'sos' ? '🆘' : '❓'}
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3 mb-1">
                   <h3 className="text-3xl font-black text-slate-900 tracking-tight uppercase italic">{selectedIncident.type} MISSION</h3>
-                  {selectedIncident.profiles?.full_name && (
-                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                      <User className="w-3 h-3" /> Assigned: {selectedIncident.profiles.full_name}
-                    </span>
-                  )}
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                    selectedIncident.urgency === 'critical' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+                  }`}>
+                    {selectedIncident.urgency} Priority
+                  </span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-400 font-bold uppercase text-xs tracking-widest">
                   <MapPin className="w-4 h-4 text-red-500" /> {selectedIncident.location_name}
@@ -1628,121 +1628,149 @@ Final assessment and certification steps.
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-              <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block">Situation Intel</label>
-                  <p className="text-slate-600 font-medium leading-relaxed bg-slate-50 p-6 rounded-[2rem] border border-slate-100 italic">
-                    "{selectedIncident.description}"
-                  </p>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Incident</label>
-                    <span className="font-black text-slate-900 uppercase text-[10px] tracking-tighter">{selectedIncident.status}</span>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Mission</label>
-                    <span className={`font-black uppercase text-[10px] tracking-tighter ${
-                      selectedIncident.tasks?.status === 'completed' ? 'text-emerald-600' : 'text-blue-600'
-                    }`}>
-                      {selectedIncident.tasks?.status || 'unassigned'}
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Urgency</label>
-                    <span className={`font-black uppercase text-[10px] tracking-tighter ${selectedIncident.urgency === 'critical' ? 'text-red-600' : 'text-orange-600'}`}>
-                      {selectedIncident.urgency}
-                    </span>
-                  </div>
-                </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                <div className="space-y-8">
+                  <section>
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 block ml-1">Situation Intel</label>
+                    <div className="bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100 relative group">
+                      <div className="absolute top-4 right-6 text-4xl text-slate-200 font-serif opacity-50">"</div>
+                      <p className="text-slate-700 font-bold leading-relaxed italic text-lg relative z-10">
+                        {selectedIncident.description}
+                      </p>
+                    </div>
+                  </section>
 
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block ml-2">Dispatch Personnel (Nearest First)</label>
-                  <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                    {volunteers
-                      .sort((a, b) => {
-                        if (!selectedIncident.location_lat || !selectedIncident.location_lng) return 0;
-                        const distA = calculateDistance(
-                          selectedIncident.location_lat, 
-                          selectedIncident.location_lng, 
-                          a.location_lat || 19.0760, 
-                          a.location_lng || 72.8777
-                        );
-                        const distB = calculateDistance(
-                          selectedIncident.location_lat, 
-                          selectedIncident.location_lng, 
-                          b.location_lat || 19.0760, 
-                          b.location_lng || 72.8777
-                        );
-                        return distA - distB;
-                      })
-                      .map((v) => (
-                        <div key={v.id} className="p-3 bg-white border border-slate-100 rounded-xl flex items-center justify-between hover:border-blue-200 transition-all">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-400">
-                              <User className="w-4 h-4" />
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                      <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Status</label>
+                      <span className="font-black text-slate-900 uppercase text-xs tracking-tighter">{selectedIncident.status}</span>
+                    </div>
+                    <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                      <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Mission</label>
+                      <span className={`font-black uppercase text-xs tracking-tighter ${
+                        selectedIncident.tasks?.status === 'completed' ? 'text-emerald-600' : 'text-blue-600'
+                      }`}>
+                        {selectedIncident.tasks?.status || 'unassigned'}
+                      </span>
+                    </div>
+                    <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                      <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Assigned</label>
+                      <span className="font-black text-slate-900 uppercase text-xs tracking-tighter truncate block">
+                        {selectedIncident.profiles?.full_name || 'None'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <section>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-4 ml-1">Dispatch Personnel (Nearest First)</label>
+                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {volunteers
+                        .sort((a, b) => {
+                          if (!selectedIncident.location_lat || !selectedIncident.location_lng) return 0;
+                          const distA = calculateDistance(
+                            selectedIncident.location_lat, 
+                            selectedIncident.location_lng, 
+                            a.location_lat || 19.0760, 
+                            a.location_lng || 72.8777
+                          );
+                          const distB = calculateDistance(
+                            selectedIncident.location_lat, 
+                            selectedIncident.location_lng, 
+                            b.location_lat || 19.0760, 
+                            b.location_lng || 72.8777
+                          );
+                          return distA - distB;
+                        })
+                        .map((v) => (
+                          <div key={v.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between hover:border-blue-300 hover:shadow-md transition-all group/vol">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover/vol:bg-blue-50 group-hover/vol:text-blue-600 transition-colors">
+                                <User className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="font-black text-slate-900 text-sm leading-none mb-1">{v.full_name}</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{v.status}</span>
+                                  <span className="w-1 h-1 rounded-full bg-slate-200" />
+                                  <span className="text-[8px] text-blue-500 font-black uppercase tracking-widest">
+                                    {calculateDistance(
+                                      selectedIncident.location_lat, 
+                                      selectedIncident.location_lng, 
+                                      v.location_lat || 19.0760, 
+                                      v.location_lng || 72.8777
+                                    ).toFixed(2)} km away
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-black text-slate-900 text-[10px] leading-tight">{v.full_name}</p>
-                              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest italic">{v.status}</p>
-                            </div>
+                            <button 
+                              onClick={() => handleAssignVolunteer(selectedIncident.id, v.id)}
+                              disabled={assignmentLoading === v.id}
+                              className="px-4 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all disabled:bg-slate-200 shadow-sm"
+                            >
+                              {assignmentLoading === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assign'}
+                            </button>
                           </div>
-                          <button 
-                            onClick={() => handleAssignVolunteer(selectedIncident.id, v.id)}
-                            disabled={assignmentLoading === v.id}
-                            className="px-3 py-1.5 bg-slate-900 text-white rounded-lg font-black text-[8px] uppercase tracking-widest hover:bg-blue-600 transition-all disabled:bg-slate-200"
-                          >
-                            {assignmentLoading === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assign'}
-                          </button>
-                        </div>
-                      ))}
+                        ))}
+                    </div>
+                  </section>
+                </div>
+
+                <div className="space-y-6">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block">Field Evidence</label>
+                  {selectedIncident.image_url ? (
+                    <div className="aspect-[4/3] rounded-[2.5rem] overflow-hidden border-8 border-slate-50 shadow-2xl group relative">
+                      <img src={selectedIncident.image_url} alt="Field" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-8">
+                        <p className="text-white text-xs font-black uppercase tracking-widest">High-Res Satellite Feed</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="aspect-[4/3] rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
+                      <ImageIcon className="w-16 h-16 mb-4 opacity-20" />
+                      <p className="text-xs font-black uppercase tracking-widest opacity-40">No Visual Intel Available</p>
+                    </div>
+                  )}
+                  <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Info className="w-5 h-5 text-blue-600" />
+                      <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest">Operational Guidance</h4>
+                    </div>
+                    <p className="text-[11px] text-blue-800 font-medium leading-relaxed italic">
+                      Prioritize immediate life-saving measures. Ensure all dispatched personnel maintain constant contact via the rescue channel. Verify secondary hazards before final approach.
+                    </p>
                   </div>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 block text-right">Field Evidence</label>
-                {selectedIncident.image_url ? (
-                  <div className="h-full max-h-[400px] rounded-[2rem] overflow-hidden border-4 border-slate-50 shadow-xl group relative">
-                    <img src={selectedIncident.image_url} alt="Field" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                    <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />
-                  </div>
-                ) : (
-                  <div className="h-64 rounded-[2rem] bg-slate-50 border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
-                    <ImageIcon className="w-12 h-12 mb-2" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">No Visual Intel</p>
-                  </div>
-                )}
               </div>
             </div>
 
-                <div className="flex gap-3 pt-8 border-t border-slate-100">
-                  <button 
-                    onClick={() => {
-                      setActiveRescueId(selectedIncident.id);
-                      setActiveTab('rescue-channel');
-                      setShowIncidentDetail(false);
-                    }}
-                    className="flex-1 bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2"
-                  >
-                    <MessageSquare className="w-4 h-4" /> Open Channel
-                  </button>
-                  <button 
-                    onClick={() => handleUpdateIncidentStatus(selectedIncident.id, 'responding')}
-                className="flex-1 bg-blue-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
+            <div className="flex gap-4 pt-8 border-t border-slate-100 shrink-0">
+              <button 
+                onClick={() => {
+                  setActiveRescueId(selectedIncident.id);
+                  setActiveTab('rescue-channel');
+                  setShowIncidentDetail(false);
+                }}
+                className="flex-[1.5] bg-slate-900 text-white py-5 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all flex items-center justify-center gap-3 active:scale-95"
+              >
+                <MessageSquare className="w-5 h-5" /> Open Command Channel
+              </button>
+              <button 
+                onClick={() => handleUpdateIncidentStatus(selectedIncident.id, 'responding')}
+                className="flex-1 bg-blue-600 text-white py-5 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95"
               >
                 Launch Response
               </button>
               <button 
                 onClick={() => handleUpdateIncidentStatus(selectedIncident.id, 'resolved')}
-                className="flex-1 bg-emerald-600 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
+                className="flex-1 bg-emerald-600 text-white py-5 rounded-[1.5rem] font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95"
               >
                 Mark Resolved
               </button>
               <button 
                 onClick={() => handleUpdateIncidentStatus(selectedIncident.id, 'closed')}
-                className="px-8 bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl hover:bg-black transition-all active:scale-95"
+                className="px-10 bg-slate-100 text-slate-400 py-5 rounded-[1.5rem] font-black uppercase text-xs tracking-widest hover:bg-red-50 hover:text-red-600 transition-all active:scale-95"
               >
                 Archive
               </button>
@@ -1985,6 +2013,10 @@ Final assessment and certification steps.
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
+      <style>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
       {/* Side Navigation Sidebar */}
       <aside 
         className={`fixed top-0 left-0 bottom-0 z-[150] bg-white border-r border-slate-100 transition-all duration-500 ease-in-out shadow-2xl flex flex-col ${
@@ -2009,7 +2041,7 @@ Final assessment and certification steps.
           </div>
 
           {/* Navigation Links */}
-          <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar overflow-x-hidden">
+          <nav className="flex-1 px-4 space-y-2 overflow-y-auto no-scrollbar overflow-x-hidden">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -2018,7 +2050,7 @@ Final assessment and certification steps.
                   activeTab === tab.id
                     ? 'bg-slate-900 text-white shadow-xl shadow-slate-200'
                     : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
-                }`}
+                } ${!isSidebarOpen ? 'justify-center' : ''}`}
               >
                 <tab.icon className={`w-5 h-5 shrink-0 transition-colors ${activeTab === tab.id ? 'text-red-500' : 'group-hover:text-slate-600'}`} />
                 {isSidebarOpen && (
