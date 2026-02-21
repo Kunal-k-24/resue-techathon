@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { 
-  Send, MapPin, Users, AlertTriangle, X, UserPlus, UserMinus, MessageSquare
+  Send, MapPin, Users, AlertTriangle, X, UserPlus, UserMinus, MessageSquare, Loader2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -13,6 +13,51 @@ interface Message {
   created_at: string;
   metadata?: any;
 }
+
+const MessageItem = memo(({ msg, currentUserId }: { msg: Message, currentUserId: string }) => {
+  return (
+    <div className={`flex flex-col ${msg.sender_id === currentUserId ? 'items-end' : 'items-start'}`}>
+      <div className={`max-w-[80%] rounded-[1.5rem] p-4 ${
+        msg.type === 'update' ? 'bg-amber-100 border border-amber-200 text-amber-900 italic text-center w-full max-w-full' :
+        msg.type === 'location' ? 'bg-blue-600 text-white' :
+        msg.sender_id === currentUserId ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'bg-white text-slate-900 border border-slate-200 shadow-sm'
+      }`}>
+        {msg.type !== 'update' && (
+          <div className="flex items-center justify-between mb-1 gap-4">
+            <span className={`text-[8px] font-black uppercase tracking-widest ${
+              msg.sender_id === currentUserId ? 'text-white/50' : 'text-slate-400'
+            }`}>
+              {msg.sender_name}
+            </span>
+            <span className={`text-[8px] font-bold ${
+              msg.sender_id === currentUserId ? 'text-white/30' : 'text-slate-300'
+            }`}>
+              {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+        )}
+        
+        {msg.type === 'location' ? (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              <p className="text-sm font-bold tracking-tight">{msg.content}</p>
+            </div>
+            <button className="w-full py-2 bg-white/20 hover:bg-white/30 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">
+              View on Map
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm font-medium leading-relaxed tracking-tight">
+            {msg.content}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
 
 interface RescueChannelProps {
   incidentId: string;
@@ -29,6 +74,7 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
   const [assignedVolunteers, setAssignedVolunteers] = useState<any[]>([]);
   const [allVolunteers, setAllVolunteers] = useState<any[]>([]);
   const [showAddVolunteer, setShowAddVolunteer] = useState(false);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -37,22 +83,39 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
 
   useEffect(() => {
     if (incidentId) {
-      fetchIncidentDetails();
-      fetchMessages();
-      fetchVolunteers();
-      subscribeToMessages();
-      subscribeToIncident();
+      // Clear previous state to show loading feel
+      setMessages([]);
+      setIncident(null);
+      setAssignedVolunteers([]);
+      
+      const loadData = async () => {
+        setLoading(true);
+        await Promise.all([
+          fetchIncidentDetails(),
+          fetchMessages(),
+          fetchVolunteers()
+        ]);
+        setLoading(false);
+      };
+      
+      loadData();
+      
+      const messageSub = subscribeToMessages();
+      const incidentSub = subscribeToIncident();
+      
+      return () => {
+        messageSub();
+        incidentSub();
+      };
     }
-    
-    // Auto-scroll to bottom
-    scrollToBottom();
   }, [incidentId]);
 
   const fetchAllIncidents = async () => {
     const { data } = await supabase
       .from('incidents')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, type, location_name, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(20); // Optimized: Limit session list
     setAllIncidents(data || []);
   };
 
@@ -86,28 +149,29 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
   };
 
   const fetchIncidentDetails = async () => {
-    const { data } = await supabase
-      .from('incidents')
-      .select('*, profiles:assigned_volunteer_id(full_name)')
-      .eq('id', incidentId)
-      .single();
-    
-    if (data) {
-      setIncident(data);
-      // Fetch all tasks for this incident to get assigned volunteers
-      const { data: tasks } = await supabase
+    // Single query to get incident AND assigned volunteers via tasks join
+    const [incidentRes, tasksRes] = await Promise.all([
+      supabase
+        .from('incidents')
+        .select('*, profiles:assigned_volunteer_id(full_name)')
+        .eq('id', incidentId)
+        .single(),
+      supabase
         .from('tasks')
         .select('assigned_to, profiles(id, full_name, status)')
-        .eq('incident_id', incidentId);
-      
-      if (tasks) {
-        const volunteers = tasks
-          .filter(t => t.profiles)
-          .map(t => t.profiles as any);
-        // De-duplicate just in case
-        const uniqueVols = Array.from(new Map(volunteers.map(v => [v.id, v])).values());
-        setAssignedVolunteers(uniqueVols);
-      }
+        .eq('incident_id', incidentId)
+    ]);
+    
+    if (incidentRes.data) {
+      setIncident(incidentRes.data);
+    }
+    
+    if (tasksRes.data) {
+      const volunteers = tasksRes.data
+        .filter(t => t.profiles)
+        .map(t => t.profiles as any);
+      const uniqueVols = Array.from(new Map(volunteers.map(v => [v.id, v])).values());
+      setAssignedVolunteers(uniqueVols);
     }
   };
 
@@ -150,7 +214,8 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
       .from('rescue_messages')
       .select('*')
       .eq('incident_id', incidentId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(50); // Optimized: Limit initial load
     
     if (data) {
       setMessages(data);
@@ -170,7 +235,7 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
         console.log('New message received via realtime:', payload);
         const newMessage = payload.new as Message;
         setMessages(prev => {
-          // Prevent duplicates
+          // Prevent duplicates by checking unique ID
           if (prev.find(m => m.id === newMessage.id)) return prev;
           return [...prev, newMessage];
         });
@@ -205,6 +270,7 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
     setNewMessage('');
 
     const { error } = await supabase.from('rescue_messages').insert([{
+      id: tempId, // Send the same UUID to the DB to prevent duplicates
       incident_id: incidentId,
       sender_id: currentUser.id,
       sender_name: currentUser.full_name || 'User',
@@ -235,6 +301,7 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
     setMessages(prev => [...prev, messageData]);
 
     const { error } = await supabase.from('rescue_messages').insert([{
+      id: tempId,
       incident_id: incidentId,
       sender_id: currentUser.id,
       sender_name: currentUser.full_name || 'User',
@@ -353,51 +420,16 @@ export default function RescueChannel({ incidentId, currentUser, onClose, onSele
           ) : (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-            {messages.map((msg) => (
-              <div 
-                key={msg.id} 
-                className={`flex flex-col ${msg.sender_id === currentUser.id ? 'items-end' : 'items-start'}`}
-              >
-                <div className={`max-w-[80%] rounded-[1.5rem] p-4 ${
-                  msg.type === 'update' ? 'bg-amber-100 border border-amber-200 text-amber-900 italic text-center w-full max-w-full' :
-                  msg.type === 'location' ? 'bg-blue-600 text-white' :
-                  msg.sender_id === currentUser.id ? 'bg-slate-900 text-white shadow-xl shadow-slate-200' : 'bg-white text-slate-900 border border-slate-200 shadow-sm'
-                }`}>
-                  {msg.type !== 'update' && (
-                    <div className="flex items-center justify-between mb-1 gap-4">
-                      <span className={`text-[8px] font-black uppercase tracking-widest ${
-                        msg.sender_id === currentUser.id ? 'text-white/50' : 'text-slate-400'
-                      }`}>
-                        {msg.sender_name}
-                      </span>
-                      <span className={`text-[8px] font-bold ${
-                        msg.sender_id === currentUser.id ? 'text-white/30' : 'text-slate-300'
-                      }`}>
-                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {msg.type === 'location' ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4" />
-                        <p className="text-sm font-bold tracking-tight">{msg.content}</p>
-                      </div>
-                      <button className="w-full py-2 bg-white/20 hover:bg-white/30 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all">
-                        View on Map
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-sm font-medium leading-relaxed tracking-tight">
-                      {msg.content}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar relative">
+                {loading && (
+                  <div className="absolute inset-0 z-10 bg-slate-50/50 backdrop-blur-[2px] flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 text-red-600 animate-spin" />
+                  </div>
+                )}
+                {messages.map((msg) => (
+                  <MessageItem key={msg.id} msg={msg} currentUserId={currentUser.id} />
+                ))}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input Area */}

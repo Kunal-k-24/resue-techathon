@@ -2,7 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, CircleMarker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Loader2 } from 'lucide-react';
+import { MapPin, Loader2, Navigation } from 'lucide-react';
+
+declare global {
+  interface Window {
+    L: any;
+  }
+}
 
 // Standard Leaflet Icon fix
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -24,29 +30,19 @@ interface ResourceMapProps {
   initialLocation?: [number, number];
   resources?: any[];
   incidents?: any[];
-  isHeatmap?: boolean;
   userLocation?: [number, number] | null;
 }
 
-function LocationMarker({ onLocationSelect, initialLocation }: { onLocationSelect: (lat: number, lng: number) => void, initialLocation?: [number, number] }) {
-  const [position, setPosition] = useState<[number, number]>(initialLocation || [19.0760, 72.8777]);
-  const map = useMap();
+function LocationMarker({ onLocationSelect, initialLocation, userLocation }: { onLocationSelect: (lat: number, lng: number) => void, initialLocation?: [number, number], userLocation?: [number, number] | null }) {
+  const [position, setPosition] = useState<[number, number]>(initialLocation || userLocation || [19.0760, 72.8777]);
 
   useEffect(() => {
-    if (!initialLocation) {
-      map.locate({ setView: false }).on("locationfound", (e: L.LocationEvent) => {
-        const newPos: [number, number] = [e.latlng.lat, e.latlng.lng];
-        setPosition(newPos);
-        map.flyTo(e.latlng, map.getZoom());
-        if (onLocationSelect) {
-          onLocationSelect(e.latlng.lat, e.latlng.lng);
-        }
-      });
-    } else {
+    if (initialLocation) {
       setPosition(initialLocation);
-      map.flyTo(initialLocation, map.getZoom());
+    } else if (userLocation) {
+      setPosition(userLocation);
     }
-  }, [map, initialLocation]);
+  }, [initialLocation, userLocation]);
   
   useMapEvents({
     click(e) {
@@ -81,12 +77,43 @@ function LocationMarker({ onLocationSelect, initialLocation }: { onLocationSelec
   );
 }
 
+function GoToMyLocation({ location }: { location: [number, number] | null }) {
+  const map = useMap();
+  
+  const handleFlyTo = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (location) {
+      console.log("Flying to location:", location);
+      map.flyTo(location as L.LatLngExpression, 18, {
+        animate: true,
+        duration: 1.5
+      });
+    } else {
+      console.warn("No location available to fly to");
+    }
+  };
+
+  if (!location) return null;
+
+  return (
+    <button
+      onClick={handleFlyTo}
+      className="absolute bottom-6 right-6 z-[1000] p-4 bg-white hover:bg-slate-50 text-blue-600 rounded-2xl shadow-2xl border border-slate-100 transition-all active:scale-95 group flex items-center gap-3"
+      style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+      title="Go to my location"
+    >
+      <Navigation className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+      <span className="text-[10px] font-black uppercase tracking-widest">My Location</span>
+    </button>
+  );
+}
+
 export default function ResourceMap({ 
   onLocationSelect, 
   initialLocation,
   resources = [],
   incidents = [],
-  isHeatmap = false,
   userLocation: providedUserLocation
 }: ResourceMapProps) {
   const [mapReady, setMapReady] = useState(false);
@@ -131,12 +158,39 @@ export default function ResourceMap({
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
+        {/* User Location Marker */}
+        {mapReady && activeUserLocation && (
+          <Marker
+            position={activeUserLocation}
+            icon={L.divIcon({
+              className: 'custom-pulse-marker',
+              html: `<div class="relative flex items-center justify-center">
+                <div class="absolute w-4 h-4 bg-blue-500 rounded-full animate-ping opacity-75"></div>
+                <div class="relative w-3 h-3 bg-blue-600 rounded-full border-2 border-white shadow-lg"></div>
+              </div>`,
+              iconSize: [20, 20],
+              iconAnchor: [10, 10]
+            })}
+          >
+            <Popup>
+              <div className="p-2">
+                <p className="font-black text-blue-600 uppercase text-[10px] tracking-widest mb-1">Your Location</p>
+                <p className="text-xs font-bold text-slate-900">Admin Command Center</p>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {mapReady && onLocationSelect && (
-          <LocationMarker onLocationSelect={onLocationSelect} initialLocation={initialLocation} />
+          <LocationMarker 
+            onLocationSelect={onLocationSelect} 
+            initialLocation={initialLocation} 
+            userLocation={activeUserLocation}
+          />
         )}
 
         {/* Render Resources as Markers */}
-        {mapReady && !isHeatmap && resources.map((res: any) => (
+        {mapReady && resources.map((res: any) => (
           <Marker 
             key={res.id} 
             position={[res.location_lat || 19.0760, res.location_lng || 72.8777]}
@@ -156,7 +210,7 @@ export default function ResourceMap({
           <CircleMarker
             key={inc.id}
             center={[inc.location_lat || 19.0760, inc.location_lng || 72.8777]}
-            radius={isHeatmap ? 8 : 12}
+            radius={12}
             pathOptions={{
               fillColor: inc.urgency === 'critical' ? '#ef4444' : '#f97316',
               color: 'white',
@@ -174,6 +228,8 @@ export default function ResourceMap({
             </Popup>
           </CircleMarker>
         ))}
+
+        {mapReady && activeUserLocation && <GoToMyLocation location={activeUserLocation} />}
       </MapContainer>
       
       {mapReady && onLocationSelect && (

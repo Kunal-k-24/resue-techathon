@@ -89,17 +89,14 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           
             // Reverse Geocoding to get City Name
             try {
-              // Using BigDataCloud's free reverse geocoding API which is CORS-friendly
-              // and specifically designed for client-side web apps.
               const targetUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`;
               
               const response = await fetch(targetUrl);
-
               if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
               
               const data = await response.json();
               
-              // BigDataCloud provides a clean hierarchy
+              // Simplify to just the city name
               const cityName = data.city || 
                               data.locality || 
                               data.principalSubdivision || 
@@ -108,8 +105,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               setWeather(prev => ({ ...prev, city: cityName }));
             } catch (err) {
               console.error("Reverse geocoding failed:", err);
-              // Fallback to a generic name if detection fails completely
-              setWeather(prev => ({ ...prev, city: prev.city || 'Command Center' }));
+              setWeather(prev => ({ ...prev, city: 'Command Center' }));
             }
         },
         (error) => {
@@ -921,32 +917,12 @@ Final assessment and certification steps.
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-8 space-y-8">
           {/* Advanced Map Overview */}
-          <div className="bg-white rounded-[3.5rem] p-4 border border-slate-100 shadow-[0_20px_50px_rgba(0,0,0,0.02)] overflow-hidden relative h-[600px] group">
-            <div className="absolute top-8 left-8 z-10 flex flex-col gap-3">
-              <div className="bg-white/90 backdrop-blur-xl p-6 rounded-[2rem] shadow-2xl border border-slate-100 ring-1 ring-slate-100">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500 animate-ping" />
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em]">Live Situational Map</h3>
-                </div>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest max-w-[180px] leading-relaxed">
-                  Real-time visualization of field reports and active resource nodes.
-                </p>
-              </div>
-            </div>
-
-            <div className="w-full h-full rounded-[3rem] overflow-hidden">
-              <ResourceMap 
-                resources={resources} 
-                incidents={incidents}
-                isHeatmap={false}
-                userLocation={userLocation}
-              />
-            </div>
-            
-            <div className="absolute bottom-8 right-8 z-10 flex gap-3">
-              <button className="px-8 py-4 bg-slate-900 rounded-2xl shadow-xl text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-black transition-all">Satellite Mode</button>
-              <button className="px-8 py-4 bg-red-600 rounded-2xl shadow-xl shadow-red-100 text-[10px] font-black uppercase tracking-[0.2em] text-white hover:bg-red-500 transition-all hover:scale-105 active:scale-95">Live Updates</button>
-            </div>
+          <div className="rounded-[3rem] bg-white border border-slate-100 shadow-xl relative overflow-hidden h-[600px]">
+            <ResourceMap 
+              resources={resources} 
+              incidents={incidents}
+              userLocation={userLocation}
+            />
           </div>
 
           {/* Detailed Activity Graph */}
@@ -2008,10 +1984,10 @@ Final assessment and certification steps.
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 flex overflow-hidden">
       {/* Side Navigation Sidebar */}
       <aside 
-        className={`fixed top-0 left-0 bottom-0 z-[110] bg-white border-r border-slate-100 transition-all duration-500 ease-in-out shadow-2xl flex flex-col ${
+        className={`fixed top-0 left-0 bottom-0 z-[150] bg-white border-r border-slate-100 transition-all duration-500 ease-in-out shadow-2xl flex flex-col ${
           isSidebarOpen ? 'w-80' : 'w-24'
         }`}
       >
@@ -2083,11 +2059,11 @@ Final assessment and certification steps.
 
       {/* Main Content Area */}
       <main 
-        className={`flex-1 min-h-screen transition-all duration-500 ease-in-out ${isSidebarOpen ? 'ml-80' : 'ml-24'}`}
+        className={`flex-1 h-screen overflow-y-auto transition-all duration-500 ease-in-out ${isSidebarOpen ? 'ml-80' : 'ml-24'}`}
       >
         {/* Top Fixed Header */}
         <header 
-          className="fixed top-0 right-0 z-[100] h-24 bg-slate-50/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-10 transition-all duration-500"
+          className="fixed top-0 right-0 z-[140] h-24 bg-slate-50/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-10 transition-all duration-500"
           style={{ left: isSidebarOpen ? '320px' : '96px' }}
         >
           <div className="flex items-center gap-6">
@@ -2160,7 +2136,7 @@ Final assessment and certification steps.
         </header>
 
         {/* Content Container */}
-        <div className="pt-36 pb-12 px-10 max-w-[1600px] mx-auto">
+        <div className="pt-24 pb-12 px-10 max-w-[1600px] mx-auto">
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
             {activeTab === 'training' && renderTraining()}
             {activeTab === 'overview' && renderOverview()}
