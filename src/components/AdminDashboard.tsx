@@ -67,26 +67,59 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   useEffect(() => {
     if (navigator.geolocation) {
+      const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000 // Cache for 30 seconds to prevent flickering
+      };
+
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
-          setUserLocation([latitude, longitude]);
           
-          // Reverse Geocoding to get City Name
-          try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`);
-            const data = await response.json();
-            const cityName = data.address.city || data.address.town || data.address.village || data.address.suburb || 'Local';
-            setWeather(prev => ({ ...prev, city: cityName }));
-          } catch (err) {
-            console.error('Error fetching city name:', err);
+          // Only update if location has significantly changed (preventing small fluctuations)
+          setUserLocation(prev => {
+            if (prev) {
+              const diffLat = Math.abs(prev[0] - latitude);
+              const diffLng = Math.abs(prev[1] - longitude);
+              if (diffLat < 0.0001 && diffLng < 0.0001) return prev;
+            }
+            return [latitude, longitude];
+          });
+          
+            // Reverse Geocoding to get City Name
+            try {
+              // Using BigDataCloud's free reverse geocoding API which is CORS-friendly
+              // and specifically designed for client-side web apps.
+              const targetUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`;
+              
+              const response = await fetch(targetUrl);
+
+              if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+              
+              const data = await response.json();
+              
+              // BigDataCloud provides a clean hierarchy
+              const cityName = data.city || 
+                              data.locality || 
+                              data.principalSubdivision || 
+                              'Local Area';
+                              
+              setWeather(prev => ({ ...prev, city: cityName }));
+            } catch (err) {
+              console.error("Reverse geocoding failed:", err);
+              // Fallback to a generic name if detection fails completely
+              setWeather(prev => ({ ...prev, city: prev.city || 'Command Center' }));
+            }
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          if (!userLocation) {
+            setUserLocation([19.0760, 72.8777]);
+            setWeather(prev => ({ ...prev, city: 'Mumbai' }));
           }
         },
-        () => {
-          console.warn("Geolocation denied, defaulting to Mumbai");
-          setUserLocation([19.0760, 72.8777]);
-          setWeather(prev => ({ ...prev, city: 'Mumbai' }));
-        }
+        options
       );
     }
   }, []);
@@ -501,45 +534,54 @@ Final assessment and certification steps.
                     </p>
                   </div>
 
-                  <div className="pt-6 border-t border-slate-50 mt-auto flex items-center justify-between gap-4">
+                  <div className="pt-6 border-t border-slate-50 mt-auto flex flex-col gap-4">
                     <button 
-                      onClick={() => handleAssignModule(mod.id, 'all')}
-                      className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-all active:scale-95"
+                      onClick={() => onNavigate(`academy-detail:${mod.id}`)}
+                      className="w-full py-3 bg-purple-50 text-purple-600 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-purple-100 transition-all active:scale-95 flex items-center justify-center gap-2"
                     >
-                      Mass Assign
+                      <Edit className="w-3 h-3" />
+                      View / Edit Academy
                     </button>
-                    <div className="relative group/dispatch">
-                      <button className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 hover:bg-white hover:text-purple-600 transition-all">
-                        <Filter className="w-4 h-4" />
+                    <div className="flex items-center justify-between gap-4">
+                      <button 
+                        onClick={() => handleAssignModule(mod.id, 'all')}
+                        className="flex-1 py-3 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-black transition-all active:scale-95"
+                      >
+                        Mass Assign
                       </button>
-                      <div className="absolute right-0 bottom-full mb-4 w-72 bg-white rounded-[2rem] shadow-2xl border border-slate-100 p-6 hidden group-hover/dispatch:block z-50 animate-in fade-in slide-in-from-bottom-2">
-                        <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-4">Precision Targeting</h5>
-                        <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2 mb-6">
-                          {volunteers.map(v => (
-                            <label key={v.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-all border border-transparent hover:border-slate-100">
-                              <input 
-                                type="checkbox"
-                                checked={selectedVolunteers.includes(v.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) setSelectedVolunteers([...selectedVolunteers, v.id]);
-                                  else setSelectedVolunteers(selectedVolunteers.filter(id => id !== v.id));
-                                }}
-                                className="w-5 h-5 rounded-lg border-slate-300 text-purple-600 focus:ring-purple-500/20"
-                              />
-                              <div className="flex flex-col">
-                                <span className="text-xs font-black text-slate-900 leading-none mb-1">{v.full_name}</span>
-                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{v.status}</span>
-                              </div>
-                            </label>
-                          ))}
-                        </div>
-                        <button 
-                          onClick={() => handleAssignModule(mod.id, 'selected')}
-                          disabled={selectedVolunteers.length === 0 || loading}
-                          className="w-full py-4 bg-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 disabled:bg-slate-200 disabled:shadow-none transition-all active:scale-95"
-                        >
-                          Dispatch ({selectedVolunteers.length})
+                      <div className="relative group/dispatch">
+                        <button className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-400 hover:bg-white hover:text-purple-600 transition-all">
+                          <Filter className="w-4 h-4" />
                         </button>
+                        <div className="absolute right-0 bottom-full mb-4 w-72 bg-white rounded-[2rem] shadow-2xl border border-slate-100 p-6 hidden group-hover/dispatch:block z-50 animate-in fade-in slide-in-from-bottom-2">
+                          <h5 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-4">Precision Targeting</h5>
+                          <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2 mb-6">
+                            {volunteers.map(v => (
+                              <label key={v.id} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-all border border-transparent hover:border-slate-100">
+                                <input 
+                                  type="checkbox"
+                                  checked={selectedVolunteers.includes(v.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedVolunteers([...selectedVolunteers, v.id]);
+                                    else setSelectedVolunteers(selectedVolunteers.filter(id => id !== v.id));
+                                  }}
+                                  className="w-5 h-5 rounded-lg border-slate-300 text-purple-600 focus:ring-purple-500/20"
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-black text-slate-900 leading-none mb-1">{v.full_name}</span>
+                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{v.status}</span>
+                                </div>
+                              </label>
+                            ))}
+                          </div>
+                          <button 
+                            onClick={() => handleAssignModule(mod.id, 'selected')}
+                            disabled={selectedVolunteers.length === 0 || loading}
+                            className="w-full py-4 bg-purple-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-purple-100 hover:bg-purple-700 disabled:bg-slate-200 disabled:shadow-none transition-all active:scale-95"
+                          >
+                            Dispatch ({selectedVolunteers.length})
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -563,11 +605,18 @@ Final assessment and certification steps.
   };
 
   const fetchIncidents = async () => {
-    const { data: incidentsData } = await supabase
-      .from('incidents')
-      .select('*, tasks(status), profiles:assigned_volunteer_id(full_name)')
-      .order('created_at', { ascending: false });
-    setIncidents(incidentsData || []);
+    try {
+      const { data: incidentsData, error } = await supabase
+        .from('incidents')
+        .select('*, tasks!task_id(status), profiles:assigned_volunteer_id(full_name)')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setIncidents(incidentsData || []);
+    } catch (error) {
+      console.error('Error fetching incidents:', error);
+      setIncidents([]);
+    }
   };
 
   const fetchTasks = async () => {
@@ -731,9 +780,13 @@ Final assessment and certification steps.
   };
 
   const incidentChartData = useMemo(() => {
+    if (!incidents || incidents.length === 0) return [];
     const counts: { [key: string]: number } = {};
     incidents.forEach(inc => {
-      counts[inc.type] = (counts[inc.type] || 0) + 1;
+      if (inc && inc.type) {
+        const type = inc.type;
+        counts[type] = (counts[type] || 0) + 1;
+      }
     });
     return Object.entries(counts).map(([name, value]) => ({ name: name.toUpperCase(), value }));
   }, [incidents]);
@@ -886,6 +939,7 @@ Final assessment and certification steps.
                 resources={resources} 
                 incidents={incidents}
                 isHeatmap={false}
+                userLocation={userLocation}
               />
             </div>
             

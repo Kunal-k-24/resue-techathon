@@ -10,6 +10,7 @@ import Navigation from './components/Navigation';
 import AuthModal from './components/AuthModal';
 import VolunteerApplication from './components/VolunteerApplication';
 import AdminDashboard from './components/AdminDashboard';
+import AcademyDetailPage from './components/AcademyDetailPage';
 import { supabase } from './lib/supabase';
 
 function App() {
@@ -18,6 +19,7 @@ function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -87,7 +89,16 @@ function App() {
 
     // Admin view
     if (userRole === 'admin') {
-      return <AdminDashboard onNavigate={handleNavigate} />;
+      if (selectedAcademyId) {
+        return <AcademyDetailPage moduleId={selectedAcademyId} onBack={() => setSelectedAcademyId(null)} />;
+      }
+      return <AdminDashboard onNavigate={(page) => {
+        if (page.startsWith('academy-detail:')) {
+          setSelectedAcademyId(page.split(':')[1]);
+        } else {
+          handleNavigate(page);
+        }
+      }} />;
     }
 
     switch (currentPage) {

@@ -25,6 +25,7 @@ interface ResourceMapProps {
   resources?: any[];
   incidents?: any[];
   isHeatmap?: boolean;
+  userLocation?: [number, number] | null;
 }
 
 function LocationMarker({ onLocationSelect, initialLocation }: { onLocationSelect: (lat: number, lng: number) => void, initialLocation?: [number, number] }) {
@@ -85,24 +86,31 @@ export default function ResourceMap({
   initialLocation,
   resources = [],
   incidents = [],
-  isHeatmap = false
+  isHeatmap = false,
+  userLocation: providedUserLocation
 }: ResourceMapProps) {
   const [mapReady, setMapReady] = useState(false);
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [internalUserLocation, setInternalUserLocation] = useState<[number, number] | null>(null);
 
   useEffect(() => {
+    if (providedUserLocation) {
+      setInternalUserLocation(providedUserLocation);
+      return;
+    }
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation([position.coords.latitude, position.coords.longitude]);
+          setInternalUserLocation([position.coords.latitude, position.coords.longitude]);
         },
         () => {
           console.warn("Geolocation denied, defaulting to Mumbai");
-          setUserLocation([19.0760, 72.8777]);
+          setInternalUserLocation([19.0760, 72.8777]);
         }
       );
     }
-  }, []);
+  }, [providedUserLocation]);
+
+  const activeUserLocation = providedUserLocation || internalUserLocation;
 
   return (
     <div className="h-full w-full rounded-2xl overflow-hidden border-2 border-slate-100 relative z-0 bg-slate-100">
@@ -112,8 +120,8 @@ export default function ResourceMap({
         </div>
       )}
       <MapContainer
-        key={userLocation ? `${userLocation[0]}-${userLocation[1]}` : 'default'}
-        center={initialLocation || userLocation || [19.0760, 72.8777]}
+        key={activeUserLocation ? `${activeUserLocation[0]}-${activeUserLocation[1]}` : 'default'}
+        center={initialLocation || activeUserLocation || [19.0760, 72.8777]}
         zoom={12}
         style={{ height: '100%', width: '100%' }}
         whenReady={() => setMapReady(true)}
