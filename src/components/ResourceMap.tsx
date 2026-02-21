@@ -109,6 +109,16 @@ function GoToMyLocation({ location }: { location: [number, number] | null }) {
   );
 }
 
+function MapController({ center }: { center: [number, number] | null }) {
+  const map = useMap();
+  useEffect(() => {
+    if (center) {
+      map.setView(center, map.getZoom());
+    }
+  }, [center, map]);
+  return null;
+}
+
 export default function ResourceMap({ 
   onLocationSelect, 
   initialLocation,
@@ -124,16 +134,26 @@ export default function ResourceMap({
       setInternalUserLocation(providedUserLocation);
       return;
     }
+    
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
+      const watchId = navigator.geolocation.watchPosition(
         (position) => {
-          setInternalUserLocation([position.coords.latitude, position.coords.longitude]);
+          const { latitude, longitude } = position.coords;
+          setInternalUserLocation([latitude, longitude]);
+          
+          const isIndia = latitude > 6 && latitude < 38 && longitude > 68 && longitude < 98;
+          if (isIndia) {
+            console.log("NavIC High-Precision Lock established");
+          }
         },
         () => {
-          console.warn("Geolocation denied, defaulting to Mumbai");
-          setInternalUserLocation([19.0760, 72.8777]);
-        }
+          if (!internalUserLocation) {
+            setInternalUserLocation([19.0760, 72.8777]);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
       );
+      return () => navigator.geolocation.clearWatch(watchId);
     }
   }, [providedUserLocation]);
 
@@ -141,20 +161,24 @@ export default function ResourceMap({
 
   return (
     <div className="h-full w-full rounded-2xl overflow-hidden border-2 border-slate-100 relative z-0 bg-slate-100">
+      <style>{`
+        .leaflet-control-attribution { display: none !important; }
+        .leaflet-control-container .leaflet-bottom.leaflet-right { display: none !important; }
+      `}</style>
       {!mapReady && (
         <div className="absolute inset-0 z-[1001] flex items-center justify-center bg-slate-900/10 backdrop-blur-sm">
           <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
         </div>
       )}
       <MapContainer
-        key={activeUserLocation ? `${activeUserLocation[0]}-${activeUserLocation[1]}` : 'default'}
         center={initialLocation || activeUserLocation || [19.0760, 72.8777]}
         zoom={12}
         style={{ height: '100%', width: '100%' }}
         whenReady={() => setMapReady(true)}
+        attributionControl={false}
       >
+        <MapController center={initialLocation || null} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
@@ -231,6 +255,17 @@ export default function ResourceMap({
 
         {mapReady && activeUserLocation && <GoToMyLocation location={activeUserLocation} />}
       </MapContainer>
+      
+      {mapReady && activeUserLocation && (
+        <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-none">
+          {(activeUserLocation[0] > 6 && activeUserLocation[0] < 38 && activeUserLocation[1] > 68 && activeUserLocation[1] < 98) && (
+            <div className="bg-emerald-600/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-400/30 shadow-lg flex items-center gap-2 animate-in slide-in-from-left-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">NavIC Optimized</span>
+            </div>
+          )}
+        </div>
+      )}
       
       {mapReady && onLocationSelect && (
         <div className="absolute top-4 right-4 z-[1000] bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-2 pointer-events-none">

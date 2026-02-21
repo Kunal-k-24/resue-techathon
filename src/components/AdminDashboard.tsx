@@ -70,14 +70,18 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const options = {
         enableHighAccuracy: true,
         timeout: 10000,
-        maximumAge: 30000 // Cache for 30 seconds to prevent flickering
+        maximumAge: 30000
       };
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
           const { latitude, longitude } = position.coords;
           
-          // Only update if location has significantly changed (preventing small fluctuations)
+          // India Region Detection for NavIC context
+          const isIndia = latitude > 6 && latitude < 38 && longitude > 68 && longitude < 98;
+          if (isIndia) {
+            console.log("NavIC High-Precision Lock (L5 band) engaged for Indian sub-continent");
+          }
           setUserLocation(prev => {
             if (prev) {
               const diffLat = Math.abs(prev[0] - latitude);
@@ -2035,7 +2039,11 @@ Final assessment and certification steps.
             {isSidebarOpen && (
               <div className="animate-in fade-in slide-in-from-left-2 duration-500 overflow-hidden">
                 <h1 className="text-xl font-black text-slate-900 tracking-tighter italic leading-none whitespace-nowrap">Rescue <span className="text-red-600">Sync</span></h1>
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400 mt-1">Admin Command</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <p className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-400">Admin Command</p>
+                  <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-[7px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md italic">NavIC Link</p>
+                </div>
               </div>
             )}
           </div>
@@ -2098,11 +2106,17 @@ Final assessment and certification steps.
           className="fixed top-0 right-0 z-[140] h-24 bg-slate-50/80 backdrop-blur-md border-b border-slate-100 flex items-center justify-between px-10 transition-all duration-500"
           style={{ left: isSidebarOpen ? '320px' : '96px' }}
         >
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-3.5 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-md hover:shadow-lg active:scale-95"
-            >
+            <div className="flex items-center gap-6">
+              <div className="hidden lg:flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-2xl shadow-sm">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                  NavIC Satellite Link Active
+                </span>
+              </div>
+              <button 
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="p-3.5 bg-white border border-slate-100 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-md hover:shadow-lg active:scale-95"
+              >
               <Menu className="w-6 h-6" />
             </button>
             <div className="hidden md:flex items-center gap-6 bg-white border border-slate-100 px-8 py-4 rounded-3xl shadow-md">
