@@ -52,6 +52,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [volunteers, setVolunteers] = useState<any[]>([]);
   const [selectedIncident, setSelectedIncident] = useState<any>(null);
   const [assignmentLoading, setAssignmentLoading] = useState<string | null>(null);
+  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [showIncidentDetail, setShowIncidentDetail] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [resources, setResources] = useState<any[]>([]);
@@ -246,12 +247,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const fetchAllData = async () => {
     setLoading(true);
     await Promise.all([
-      fetchApplications(), 
-      fetchStats(), 
-      fetchUsers(), 
-      fetchIncidents(), 
+      fetchIncidents(),
       fetchTasks(),
       fetchVolunteers(),
+      fetchUsers(),
+      fetchStats(),
+      fetchApplications(),
       fetchResources(),
       fetchTrainingModules()
     ]);
@@ -262,6 +263,42 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     const { data } = await supabase.from('training_modules').select('*').order('created_at', { ascending: false });
     setTrainingModules(data || []);
   };
+
+  useEffect(() => {
+    const autoAssign = async () => {
+      if (showIncidentDetail && selectedIncident && selectedIncident.status === 'pending' && (selectedIncident.urgency === 'critical' || selectedIncident.type === 'sos' || selectedIncident.severity === 'critical')) {
+        const { data: latestVols } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'volunteer')
+          .or('status.eq.active,status.eq.online');
+
+        if (latestVols && latestVols.length > 0) {
+          const sortedVolunteers = [...latestVols].sort((a, b) => {
+            const distA = calculateDistance(
+              selectedIncident.location_lat, 
+              selectedIncident.location_lng, 
+              a.location_lat || 19.0760, 
+              a.location_lng || 72.8777
+            );
+            const distB = calculateDistance(
+              selectedIncident.location_lat, 
+              selectedIncident.location_lng, 
+              b.location_lat || 19.0760, 
+              b.location_lng || 72.8777
+            );
+            return distA - distB;
+          });
+
+          const nearestAvailable = sortedVolunteers[0];
+          if (nearestAvailable && !assignmentLoading && !isAutoAssigning) {
+            await handleAssignVolunteer(selectedIncident.id, nearestAvailable.id, true);
+          }
+        }
+      }
+    };
+    autoAssign();
+  }, [showIncidentDetail, selectedIncident?.id]);
 
   const handleCreateModule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1469,9 +1506,10 @@ Final assessment and certification steps.
     }
   };
 
-  const handleAssignVolunteer = async (incidentId: string, volunteerId: string) => {
+  const handleAssignVolunteer = async (incidentId: string, volunteerId: string, isAuto: boolean = false) => {
     if (assignmentLoading) return;
     setAssignmentLoading(volunteerId);
+    if (isAuto) setIsAutoAssigning(true);
     try {
       const incident = incidents.find(i => i.id === incidentId);
       if (!incident) throw new Error('Incident not found');
@@ -1481,7 +1519,7 @@ Final assessment and certification steps.
         .from('tasks')
         .insert([{
           title: `Mission: ${incident.type.toUpperCase()}`,
-          description: `Emergency Response at ${incident.location_name}. Details: ${incident.description}`,
+          description: `Emergency Response at ${incident.location_name}. Details: ${incident.description}${isAuto ? ' (AUTO-ASSIGNED NEAREST)' : ''}`,
           location: incident.location_name,
           priority: incident.urgency === 'critical' ? 'urgent' : 'high',
           status: 'pending',
@@ -1510,7 +1548,8 @@ Final assessment and certification steps.
         ...inc, 
         status: 'responding',
         assigned_volunteer_id: volunteerId,
-        task_id: taskData.id
+        task_id: taskData.id,
+        is_auto_assigned: isAuto
       } : inc));
       
       if (selectedIncident?.id === incidentId) {
@@ -1518,18 +1557,22 @@ Final assessment and certification steps.
           ...prev, 
           status: 'responding',
           assigned_volunteer_id: volunteerId,
-          task_id: taskData.id
+          task_id: taskData.id,
+          is_auto_assigned: isAuto
         } : null));
       }
 
-      alert('Volunteer dispatched successfully!');
+      if (!isAuto) {
+        alert('Volunteer dispatched successfully!');
+      }
       fetchTasks();
       fetchIncidents(); // Refetch to get joined data if any
     } catch (error) {
       console.error('Error assigning volunteer:', error);
-      alert('Assignment failed. Please check your connection.');
+      if (!isAuto) alert('Assignment failed. Please check your connection.');
     } finally {
       setAssignmentLoading(null);
+      if (isAuto) setIsAutoAssigning(false);
     }
   };
 
@@ -1650,13 +1693,18 @@ Final assessment and certification steps.
                       <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Status</label>
                       <span className="font-black text-slate-900 uppercase text-xs tracking-tighter">{selectedIncident.status}</span>
                     </div>
-                    <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
+                    <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 relative group/assign">
                       <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Mission</label>
-                      <span className={`font-black uppercase text-xs tracking-tighter ${
-                        selectedIncident.tasks?.status === 'completed' ? 'text-emerald-600' : 'text-blue-600'
-                      }`}>
-                        {selectedIncident.tasks?.status || 'unassigned'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-black uppercase text-xs tracking-tighter ${
+                          selectedIncident.tasks?.status === 'completed' ? 'text-emerald-600' : 'text-blue-600'
+                        }`}>
+                          {selectedIncident.tasks?.status || 'unassigned'}
+                        </span>
+                        {selectedIncident.is_auto_assigned && (
+                          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded text-[8px] font-black uppercase tracking-widest animate-pulse">Auto</span>
+                        )}
+                      </div>
                     </div>
                     <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100">
                       <label className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-1">Assigned</label>
@@ -1710,10 +1758,21 @@ Final assessment and certification steps.
                             </div>
                             <button 
                               onClick={() => handleAssignVolunteer(selectedIncident.id, v.id)}
-                              disabled={assignmentLoading === v.id}
-                              className="px-4 py-2 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all disabled:bg-slate-200 shadow-sm"
+                              disabled={assignmentLoading === v.id || isAutoAssigning}
+                              className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 shadow-sm ${
+                                selectedIncident.assigned_volunteer_id === v.id 
+                                ? 'bg-emerald-600 text-white hover:bg-red-600 group/btn-assign' 
+                                : 'bg-slate-900 text-white hover:bg-blue-600'
+                              }`}
                             >
-                              {assignmentLoading === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Assign'}
+                              {assignmentLoading === v.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 
+                               selectedIncident.assigned_volunteer_id === v.id ? (
+                                 <span className="flex items-center gap-1">
+                                   <CheckCircle className="w-3 h-3" /> 
+                                   <span className="group-hover/btn-assign:hidden">Assigned</span>
+                                   <span className="hidden group-hover/btn-assign:inline">Reassign?</span>
+                                 </span>
+                               ) : 'Assign'}
                             </button>
                           </div>
                         ))}
@@ -1797,24 +1856,22 @@ Final assessment and certification steps.
       const { error } = await supabase
         .from('incidents')
         .insert([{
-          type: triggerForm.type,
-          description: triggerForm.description,
-          location_name: `Sector-${Math.floor(Math.random() * 1000)}`,
+          ...triggerForm,
           location_lat: lat,
           location_lng: lng,
           status: 'pending',
-          urgency: triggerForm.severity,
-          reporter_id: user?.id
+          reported_by: user?.id,
+          image_url: triggerForm.type === 'sos' ? 'https://images.unsplash.com/photo-1582139329536-e7284fece509?auto=format&fit=crop&q=80&w=800' : null
         }]);
 
       if (error) throw error;
-      
-      alert('Disaster Event Triggered Successfully!');
+
+      alert('Emergency Incident Triggered!');
       setTriggerForm({
         type: 'flood',
-        location_name: '',
+        severity: 'medium',
         description: '',
-        severity: 'high',
+        location_name: '',
         location_lat: userLocation?.[0] || 19.0760,
         location_lng: userLocation?.[1] || 72.8777
       });
@@ -2206,47 +2263,74 @@ Final assessment and certification steps.
                         <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-red-50 group-hover:text-red-600 transition-colors">
                           <User className="w-7 h-7" />
                         </div>
-                        <div>
-                          <h3 className="text-xl font-black text-slate-900 tracking-tight">{app.full_name}</h3>
-                          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">{app.contact_number}</p>
+                          <div className="flex flex-col">
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none mb-1">{app.full_name}</h3>
+                            <div className="flex items-center gap-3">
+                              <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest">{app.city}, {app.state}</p>
+                              <span className="w-1 h-1 rounded-full bg-slate-200" />
+                              <p className="text-red-600 font-black text-[10px] uppercase tracking-widest">{app.blood_group} Blood</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApprove(app)}
+                            disabled={!!processingId}
+                            className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-90 flex items-center gap-2 group/btn"
+                          >
+                            <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover/btn:block">Approve</span>
+                            {processingId === app.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                          </button>
+                          <button
+                            onClick={() => handleReject(app)}
+                            disabled={!!processingId}
+                            className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-90 flex items-center gap-2 group/btn"
+                          >
+                            <span className="text-[10px] font-black uppercase tracking-widest hidden group-hover/btn:block">Reject</span>
+                            <XCircle className="w-5 h-5" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleApprove(app)}
-                          disabled={!!processingId}
-                          className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-90"
-                        >
-                          {processingId === app.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
-                        </button>
-                        <button
-                          onClick={() => handleReject(app)}
-                          disabled={!!processingId}
-                          className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm active:scale-90"
-                        >
-                          <XCircle className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
 
-                    <div className="space-y-4">
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Qualifications</p>
-                        <div className="flex flex-wrap gap-2">
-                          {app.skills?.map((skill: string, i: number) => (
-                            <span key={i} className="px-3 py-1 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold border border-slate-100 italic">
-                              #{skill}
-                            </span>
-                          ))}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div className="space-y-4">
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Primary Expertise</p>
+                            <div className="flex flex-wrap gap-2">
+                              {app.special_skills?.map((skill: string, i: number) => (
+                                <span key={i} className="px-2.5 py-1 bg-white text-slate-700 rounded-lg text-[10px] font-black uppercase border border-slate-200 shadow-sm">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Certifications</p>
+                            <div className="flex flex-wrap gap-2">
+                              {app.first_aid_certified && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[8px] font-black uppercase tracking-widest">First Aid</span>}
+                              {app.cpr_certified && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-md text-[8px] font-black uppercase tracking-widest">CPR</span>}
+                              {app.fire_safety_certified && <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-md text-[8px] font-black uppercase tracking-widest">Fire Safety</span>}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Emergency Contact</p>
+                          <div className="space-y-1">
+                            <p className="text-xs font-black text-slate-900">{app.emergency_contact_name}</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{app.emergency_contact_phone}</p>
+                            <p className="text-[10px] font-medium text-slate-400 italic">Relation: {app.emergency_contact_relation}</p>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Statement of Intent</p>
-                        <p className="text-slate-500 text-sm font-medium leading-relaxed italic line-clamp-3">"{app.reason}"</p>
+
+                      <div className="space-y-4">
+                        <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-xl shadow-slate-200">
+                          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Statement of Intent</p>
+                          <p className="text-xs font-medium leading-relaxed italic opacity-90">"{app.previous_volunteer_work || 'No prior experience listed.'}"</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
             {activeTab === 'users' && (
